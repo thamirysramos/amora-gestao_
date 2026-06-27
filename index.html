@@ -277,7 +277,11 @@ tr:hover td{background:var(--bg)}
   <div class="stats-grid" id="stats-pedidos"></div>
   <div class="section-header">
     <span class="section-title">Pedidos recebidos</span>
-    <button class="btn-primary btn-sm" onclick="abrirNovoPedido()"><i class="ti ti-plus"></i> Registrar pedido</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn-ghost btn-sm dona-only" onclick="openModal('modal-importar-pedidos')"><i class="ti ti-file-import"></i> Importar planilha</button>
+      <button class="btn-ghost btn-sm dona-only" onclick="baixarModeloPedidos()"><i class="ti ti-download"></i> Baixar modelo</button>
+      <button class="btn-primary btn-sm" onclick="abrirNovoPedido()"><i class="ti ti-plus"></i> Registrar pedido</button>
+    </div>
   </div>
   <div class="filters">
     <input type="text" id="search-pedidos" placeholder="🔍 Buscar cliente ou produto..." oninput="renderPedidos()">
@@ -472,6 +476,33 @@ tr:hover td{background:var(--bg)}
   </div>
 </div>
 
+<!-- MODAL IMPORTAR PEDIDOS -->
+<div class="modal-bg" id="modal-importar-pedidos">
+  <div class="modal">
+    <h3>Importar planilha de pedidos</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:6px">Suba uma planilha Excel (.xlsx) com o histórico de pedidos. Use o botão <strong>"Baixar modelo"</strong> para ver o formato correto.</p>
+    <div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:var(--radius);padding:8px 12px;font-size:12px;color:#E65100;margin-bottom:1rem;display:flex;align-items:flex-start;gap:6px">
+      <i class="ti ti-alert-triangle" style="margin-top:1px;flex-shrink:0"></i>
+      <span>Pedidos importados são registrados como histórico e <strong>não baixam o estoque automaticamente</strong>. Use para trazer dados antigos para o sistema.</span>
+    </div>
+    <div class="import-area" id="import-area-pedidos" onclick="document.getElementById('import-input-pedidos').click()">
+      <i class="ti ti-file-spreadsheet"></i>
+      <span id="import-label-pedidos" style="font-size:13px;color:var(--text2)">Clique para selecionar o arquivo Excel (.xlsx)</span>
+    </div>
+    <input type="file" id="import-input-pedidos" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportPedidos(this)">
+    <div id="import-preview-pedidos" style="display:none">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin:10px 0 6px;text-transform:uppercase;letter-spacing:0.04em">Preview — primeiros 5 pedidos</div>
+      <div class="import-preview" id="import-preview-list-pedidos"></div>
+      <div style="margin-top:8px;font-size:13px;color:var(--text2)">Total: <strong id="import-total-pedidos">0</strong> pedidos encontrados</div>
+    </div>
+    <div id="import-erro-pedidos" style="display:none;background:#FCEBEB;border:1px solid #F09595;border-radius:var(--radius);padding:8px 12px;font-size:13px;color:#791F1F;margin-top:10px"></div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-importar-pedidos');limparImportPedidos()">Cancelar</button>
+      <button class="btn-primary" id="btn-importar-pedidos" onclick="confirmarImportPedidos()" disabled><i class="ti ti-check"></i> Importar pedidos</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -658,6 +689,72 @@ function baixarModelo(){
   ]);
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Produtos');
   XLSX.writeFile(wb,'modelo-importacao-amora.xlsx');
+}
+
+// ============ IMPORTAR PEDIDOS ============
+let importDataPedidos=[];
+function handleImportPedidos(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(!rows.length){showImportErroPedidos('Planilha vazia ou formato inválido.');return;}
+      const canaisValidos=['site','whatsapp','instagram','loja'];
+      const statusValidos=['pendente','confirmado','enviado','cancelado'];
+      importDataPedidos=rows.map(r=>({
+        cliente:String(r.cliente||r.Cliente||r.CLIENTE||'').trim(),
+        canal:String(r.canal||r.Canal||'whatsapp').trim().toLowerCase(),
+        produto:String(r.produto||r.Produto||r.produtos||r.Produtos||'').trim(),
+        valor:parseFloat(String(r.valor||r.Valor||0).replace(',','.'))||0,
+        status:String(r.status||r.Status||'pendente').trim().toLowerCase(),
+        obs:String(r.obs||r.Observacoes||r.observações||'').trim(),
+        data_pedido:String(r.data_pedido||r.data||r.Data||todayStr()).trim()||todayStr()
+      })).filter(r=>r.cliente).map(r=>({
+        ...r,
+        canal:canaisValidos.includes(r.canal)?r.canal:'whatsapp',
+        status:statusValidos.includes(r.status)?r.status:'pendente'
+      }));
+      if(!importDataPedidos.length){showImportErroPedidos('Nenhum pedido válido encontrado. Verifique se a coluna "cliente" existe.');return;}
+      document.getElementById('import-erro-pedidos').style.display='none';
+      document.getElementById('import-label-pedidos').textContent=`✓ ${file.name} — ${importDataPedidos.length} pedidos encontrados`;
+      document.getElementById('import-total-pedidos').textContent=importDataPedidos.length;
+      const preview=importDataPedidos.slice(0,5).map(r=>`<div class="import-row"><span>${r.cliente}</span><span>${CANAIS[r.canal]||r.canal} · ${r.produto||'—'} · ${fmtMoney(r.valor)}</span></div>`).join('');
+      document.getElementById('import-preview-list-pedidos').innerHTML=preview;
+      document.getElementById('import-preview-pedidos').style.display='block';
+      document.getElementById('btn-importar-pedidos').disabled=false;
+    }catch(err){showImportErroPedidos('Erro ao ler o arquivo: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+function showImportErroPedidos(msg){const el=document.getElementById('import-erro-pedidos');el.textContent=msg;el.style.display='block';}
+async function confirmarImportPedidos(){
+  if(!importDataPedidos.length)return;
+  const btn=document.getElementById('btn-importar-pedidos');
+  btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Importando...';
+  setSyncing(true);
+  try{
+    const res=await dbInsert('pedidos',importDataPedidos);
+    if(Array.isArray(res))pedidos.push(...res);
+    toast(`${importDataPedidos.length} pedidos importados com sucesso!`);
+    closeModal('modal-importar-pedidos');limparImportPedidos();
+    buildMesOptions('filter-mes-pedidos','data_pedido',pedidos);renderPedidos();
+  }catch(e){showImportErroPedidos('Erro ao importar: '+e.message);}
+  finally{setSyncing(false);btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> Importar pedidos';}
+}
+function limparImportPedidos(){importDataPedidos=[];document.getElementById('import-input-pedidos').value='';document.getElementById('import-preview-pedidos').style.display='none';document.getElementById('import-erro-pedidos').style.display='none';document.getElementById('import-label-pedidos').textContent='Clique para selecionar o arquivo Excel (.xlsx)';document.getElementById('btn-importar-pedidos').disabled=true;}
+function baixarModeloPedidos(){
+  const ws=XLSX.utils.aoa_to_sheet([
+    ['cliente','canal','produto','valor','status','data_pedido','obs'],
+    ['Maria Silva','whatsapp','One Piece Vol. 1',29.90,'enviado','2026-06-01',''],
+    ['João Costa','instagram','Funko Pop Naruto',89.90,'confirmado','2026-06-05',''],
+    ['Ana Lima','site','Tiny Toy Capivara x5',30.00,'pendente','2026-06-10','Entregar na loja'],
+    ['Pedro Rocha','loja','Camisa Demon Slayer',79.90,'cancelado','2026-06-12','Cliente desistiu'],
+  ]);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Pedidos');
+  XLSX.writeFile(wb,'modelo-importacao-pedidos-amora.xlsx');
 }
 
 function goPage(p){
