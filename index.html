@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amora Gestão</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--amora:#C94B7B;--amora-hover:#b03e6b;--amora-light:#FBEAF0;--amora-dark:#72243E;--amora2:#F4C0D1;--bg:#FAF8F6;--surface:#FFFFFF;--surface2:#F4F1EE;--border:rgba(0,0,0,0.08);--border-med:rgba(0,0,0,0.13);--text:#1A1410;--text2:#6B5F58;--text3:#A89D96;--radius:10px;--radius-lg:14px;--shadow:0 1px 3px rgba(0,0,0,0.07),0 4px 12px rgba(0,0,0,0.05);--shadow-md:0 4px 16px rgba(0,0,0,0.10),0 1px 4px rgba(0,0,0,0.06)}
+body{font-family:'Nunito Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+.nav{background:var(--surface);border-bottom:1px solid var(--border);height:60px;display:flex;align-items:center;padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 1px 0 var(--border)}
+.nav-logo{display:flex;align-items:center;gap:10px;margin-right:2rem}
+.nav-logo .dot{width:32px;height:32px;border-radius:50%;background:var(--amora);display:flex;align-items:center;justify-content:center}
+.nav-logo .dot i{color:#fff;font-size:16px}
+.nav-logo span{font-family:'Nunito',sans-serif;font-size:16px;font-weight:800;color:var(--text);letter-spacing:-0.3px}
+.nav-logo span em{color:var(--amora);font-style:normal}
+.nav-tabs{display:flex;gap:2px;flex:1}
+.nav-tab{padding:7px 16px;border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--text2);display:flex;align-items:center;gap:7px;transition:all 0.15s;font-family:'Nunito Sans',sans-serif;white-space:nowrap}
+.nav-tab:hover{background:var(--surface2);color:var(--text)}
+.nav-tab.active{background:var(--amora-light);color:var(--amora-dark)}
+.nav-tab .nbadge{background:var(--amora);color:#fff;border-radius:99px;padding:1px 7px;font-size:11px;font-weight:700;min-width:20px;text-align:center}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.sync-indicator{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text3);padding:4px 10px;border-radius:99px;background:var(--surface2)}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#4CAF50}
+.sync-dot.loading{background:#FF9800;animation:pulse 1s infinite}
+.sync-dot.error{background:#F44336}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.page{display:none;padding:1.5rem;max-width:1200px;margin:0 auto}
+.page.active{display:block}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:1.5rem}
+.stat-card{background:var(--surface);border-radius:var(--radius-lg);padding:1rem 1.125rem;border:1px solid var(--border);box-shadow:var(--shadow)}
+.stat-card .slabel{font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px}
+.stat-card .svalue{font-size:24px;font-weight:800;font-family:'Nunito',sans-serif;color:var(--text);line-height:1}
+.stat-card .ssub{font-size:11px;color:var(--text3);margin-top:3px}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.section-title{font-size:15px;font-weight:700;font-family:'Nunito',sans-serif;color:var(--text)}
+.btn-primary{background:var(--amora);color:#fff;border:none;padding:8px 16px;border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background 0.15s,transform 0.1s;font-family:'Nunito Sans',sans-serif}
+.btn-primary:hover{background:var(--amora-hover)}
+.btn-primary:active{transform:scale(0.98)}
+.btn-primary:disabled{opacity:0.6;cursor:not-allowed}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn-ghost{background:transparent;border:1px solid var(--border-med);color:var(--text2);padding:5px 10px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all 0.12s;font-family:'Nunito Sans',sans-serif}
+.btn-ghost:hover{background:var(--surface2)}
+.btn-danger{background:transparent;border:1px solid var(--border);color:#A32D2D;padding:5px 8px;border-radius:var(--radius);font-size:12px;cursor:pointer;display:inline-flex;align-items:center;transition:all 0.12s}
+.btn-danger:hover{background:#FCEBEB;border-color:#F09595}
+.filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.filters input,.filters select{padding:7px 11px;border:1px solid var(--border-med);border-radius:var(--radius);font-size:13px;background:var(--surface);color:var(--text);font-family:'Nunito Sans',sans-serif;transition:border 0.15s}
+.filters input:focus,.filters select:focus{outline:none;border-color:var(--amora)}
+.filters input{flex:1;min-width:180px}
+.cat-tabs{display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap}
+.cat-tab{padding:4px 13px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border-med);background:var(--surface);color:var(--text2);transition:all 0.12s;font-family:'Nunito Sans',sans-serif}
+.cat-tab:hover{background:var(--surface2)}
+.cat-tab.active{border-color:var(--amora);background:var(--amora-light);color:var(--amora-dark)}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);margin-bottom:1.5rem}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+th{text-align:left;padding:10px 14px;font-size:11px;font-weight:700;color:var(--text3);border-bottom:1px solid var(--border);background:var(--surface2);text-transform:uppercase;letter-spacing:0.05em}
+td{padding:8px 14px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg)}
+.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap}
+.badge-manga{background:#E6F1FB;color:#0C447C}.badge-pokemon{background:#FAEEDA;color:#633806}.badge-funko{background:#FBEAF0;color:#72243E}
+.badge-tinytoy{background:#EAF3DE;color:#27500A}.badge-yugioh{background:#EEEDFE;color:#3C3489}.badge-camisa{background:#FAECE7;color:#712B13}
+.badge-outro{background:var(--surface2);color:var(--text2)}.badge-ok{background:#EAF3DE;color:#27500A}.badge-baixo{background:#FAEEDA;color:#633806}
+.badge-zerado{background:#FCEBEB;color:#791F1F}.badge-pendente{background:#FAEEDA;color:#633806}.badge-confirmado{background:#EAF3DE;color:#27500A}
+.badge-enviado{background:#E6F1FB;color:#0C447C}.badge-cancelado{background:#FCEBEB;color:#791F1F}.badge-avaliando{background:#FAEEDA;color:#633806}
+.badge-aceito{background:#EAF3DE;color:#27500A}.badge-recusado{background:#FCEBEB;color:#791F1F}.badge-canal{background:var(--surface2);color:var(--text2)}
+.badge-dona{background:#FBEAF0;color:#72243E}.badge-funcionaria{background:#EAF3DE;color:#27500A}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:1.5rem;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-md);animation:slideUp 0.18s ease}
+@keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal h3{font-size:16px;font-weight:800;font-family:'Nunito',sans-serif;margin-bottom:1.25rem;color:var(--text)}
+.form-row{margin-bottom:14px}
+.form-row label{display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em}
+.form-row input,.form-row select,.form-row textarea{width:100%;padding:8px 11px;border:1px solid var(--border-med);border-radius:var(--radius);font-size:13px;background:var(--surface);color:var(--text);font-family:'Nunito Sans',sans-serif;transition:border 0.15s}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:none;border-color:var(--amora)}
+.form-row textarea{resize:vertical;min-height:70px}
+.form-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem;padding-top:14px;border-top:1px solid var(--border)}
+.foto-upload-area{border:2px dashed var(--border-med);border-radius:var(--radius);padding:1rem;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--bg)}
+.foto-upload-area:hover{border-color:var(--amora);background:var(--amora-light)}
+.foto-upload-area.tem-foto{border-style:solid;border-color:var(--amora);padding:6px}
+.foto-upload-area i{font-size:24px;color:var(--text3);display:block;margin-bottom:4px}
+.foto-upload-area span{font-size:12px;color:var(--text3)}
+.foto-preview{width:100%;height:120px;object-fit:contain;border-radius:6px;display:block}
+.foto-progress{height:3px;background:var(--surface2);border-radius:99px;margin-top:6px;overflow:hidden;display:none}
+.foto-progress-bar{height:100%;background:var(--amora);border-radius:99px;width:0%;transition:width 0.3s}
+.prod-thumb{width:36px;height:36px;border-radius:6px;object-fit:cover;border:1px solid var(--border);background:var(--surface2);flex-shrink:0}
+.prod-thumb-placeholder{width:36px;height:36px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.prod-nome-cell{display:flex;align-items:center;gap:10px}
+.consig-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.125rem 1.25rem;margin-bottom:10px;box-shadow:var(--shadow);transition:box-shadow 0.15s}
+.consig-card:hover{box-shadow:var(--shadow-md)}
+.consig-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
+.consig-name{font-size:14px;font-weight:700;font-family:'Nunito',sans-serif;color:var(--text)}
+.consig-meta{font-size:12px;color:var(--text3);margin-top:2px;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.consig-body{font-size:13px;color:var(--text2);border-top:1px solid var(--border);padding-top:10px;margin-top:8px;line-height:1.6}
+.consig-body strong{color:var(--text);font-weight:700}
+.consig-actions{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.stock-num{font-size:13px;font-weight:700}
+.stock-low{color:#BA7517}.stock-zero{color:#A32D2D}.stock-ok{color:#3B6D11}
+.empty{text-align:center;padding:3rem 1rem;color:var(--text3);font-size:13px}
+.empty i{font-size:36px;display:block;margin-bottom:10px;opacity:0.35}
+.empty p{font-size:14px;color:var(--text3)}
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--text);color:#fff;padding:10px 16px;border-radius:var(--radius);font-size:13px;font-weight:600;z-index:999;opacity:0;transform:translateY(8px);transition:all 0.2s;pointer-events:none;display:flex;align-items:center;gap:7px;max-width:320px;box-shadow:var(--shadow-md)}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.success{background:#2E7D32}.toast.error{background:#C62828}.toast.warn{background:#E65100}
+.loading-overlay{position:fixed;inset:0;background:var(--bg);z-index:300;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;transition:opacity 0.3s}
+.loading-overlay.hidden{opacity:0;pointer-events:none}
+.loading-logo{font-family:'Nunito',sans-serif;font-size:22px;font-weight:800;color:var(--amora)}
+.loading-spinner{width:36px;height:36px;border:3px solid var(--amora2);border-top-color:var(--amora);border-radius:50%;animation:spin 0.7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:13px;color:var(--text3)}
+.login-screen{position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;align-items:center;justify-content:center}
+.login-screen.hidden{display:none}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem;width:360px;max-width:95vw;box-shadow:var(--shadow-md);animation:slideUp 0.2s ease}
+.login-logo{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:1.75rem}
+.login-logo .dot{width:40px;height:40px;border-radius:50%;background:var(--amora);display:flex;align-items:center;justify-content:center}
+.login-logo .dot i{color:#fff;font-size:20px}
+.login-logo span{font-family:'Nunito',sans-serif;font-size:20px;font-weight:800;color:var(--text)}
+.login-logo span em{color:var(--amora);font-style:normal}
+.login-title{font-size:15px;font-weight:700;font-family:'Nunito',sans-serif;color:var(--text);margin-bottom:4px;text-align:center}
+.login-sub{font-size:13px;color:var(--text3);text-align:center;margin-bottom:1.5rem}
+.login-form .lform-row{margin-bottom:14px}
+.login-form label{display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em}
+.login-form input{width:100%;padding:9px 12px;border:1px solid var(--border-med);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text);font-family:'Nunito Sans',sans-serif;transition:border 0.15s}
+.login-form input:focus{outline:none;border-color:var(--amora)}
+.login-erro{background:#FCEBEB;border:1px solid #F09595;border-radius:var(--radius);padding:8px 12px;font-size:13px;color:#791F1F;margin-bottom:12px;display:none;align-items:center;gap:6px}
+.login-erro.show{display:flex}
+.login-btn{width:100%;padding:10px;background:var(--amora);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:700;cursor:pointer;font-family:'Nunito',sans-serif;transition:background 0.15s;margin-top:4px}
+.login-btn:hover{background:var(--amora-hover)}
+.login-btn:disabled{opacity:0.6;cursor:not-allowed}
+.user-info{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)}
+.user-avatar{width:30px;height:30px;border-radius:50%;background:var(--amora-light);border:1px solid var(--amora2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--amora-dark);cursor:pointer}
+.btn-logout{background:transparent;border:1px solid var(--border-med);color:var(--text3);padding:4px 10px;border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:'Nunito Sans',sans-serif;transition:all 0.12s}
+.btn-logout:hover{background:#FCEBEB;color:#A32D2D;border-color:#F09595}
+.painel-filtros{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:var(--shadow)}
+.painel-filtros label{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.04em}
+.painel-filtros select{padding:6px 10px;border:1px solid var(--border-med);border-radius:var(--radius);font-size:13px;background:var(--surface);color:var(--text);font-family:'Nunito Sans',sans-serif}
+.painel-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:1.25rem}
+.painel-card{background:var(--surface);border-radius:var(--radius-lg);padding:1rem 1.25rem;border:1px solid var(--border);box-shadow:var(--shadow)}
+.painel-card .plabel{font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.painel-card .pvalue{font-size:26px;font-weight:800;font-family:'Nunito',sans-serif;color:var(--text);line-height:1}
+.painel-card .psub{font-size:11px;color:var(--text3);margin-top:4px}
+.painel-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1.25rem}
+.painel-box{background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);box-shadow:var(--shadow);padding:1.125rem 1.25rem}
+.painel-box h4{font-size:13px;font-weight:700;font-family:'Nunito',sans-serif;color:var(--text);margin-bottom:12px}
+.canal-item{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.canal-item:last-child{border-bottom:none}
+.canal-bar-wrap{flex:1;margin:0 12px;height:6px;background:var(--surface2);border-radius:99px;overflow:hidden}
+.canal-bar{height:100%;background:var(--amora);border-radius:99px;transition:width 0.4s}
+@media(max-width:700px){.painel-row{grid-template-columns:1fr}}
+.itens-section{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:14px}
+.itens-section h4{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px}
+.item-row{display:grid;grid-template-columns:1fr 80px 90px 32px;gap:6px;align-items:center;margin-bottom:8px}
+.item-row select,.item-row input{padding:6px 8px;border:1px solid var(--border-med);border-radius:var(--radius);font-size:12px;background:var(--surface);color:var(--text);font-family:'Nunito Sans',sans-serif;width:100%}
+.item-row select:focus,.item-row input:focus{outline:none;border-color:var(--amora)}
+.item-estoque-info{font-size:11px;margin-top:2px;padding:0 2px}
+.estoque-ok{color:#3B6D11}.estoque-baixo{color:#BA7517}.estoque-zero{color:#A32D2D}
+.itens-resumo{background:var(--surface);border-radius:var(--radius);padding:8px 10px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:13px;border:1px solid var(--border)}
+.itens-resumo strong{font-family:'Nunito',sans-serif;font-size:15px;color:var(--amora)}
+.alerta-estoque{background:#FFF3E0;border:1px solid #FFB74D;border-radius:var(--radius);padding:8px 12px;font-size:12px;color:#E65100;margin-bottom:10px;display:none;align-items:center;gap:6px}
+.alerta-estoque.show{display:flex}
+/* IMPORT */
+.import-area{border:2px dashed var(--border-med);border-radius:var(--radius);padding:1.5rem;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--bg)}
+.import-area:hover{border-color:var(--amora);background:var(--amora-light)}
+.import-area i{font-size:28px;color:var(--text3);display:block;margin-bottom:6px}
+.import-preview{background:var(--surface2);border-radius:var(--radius);padding:10px 12px;margin-top:10px;font-size:12px;color:var(--text2);max-height:160px;overflow-y:auto}
+.import-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)}
+.import-row:last-child{border-bottom:none}
+/* SENHA */
+.perfil-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600}
+</style>
+</head>
+<body>
+
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <div class="login-logo"><div class="dot"><i class="ti ti-heart"></i></div><span>Amora <em>Gestão</em></span></div>
+    <div class="login-title">Bem-vinda de volta!</div>
+    <div class="login-sub">Entre com seu email e senha para continuar</div>
+    <div class="login-form">
+      <div class="lform-row" style="margin-bottom:14px"><label>Email</label><input type="email" id="login-email" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')fazerLogin()"></div>
+      <div class="lform-row" style="margin-bottom:14px"><label>Senha</label><input type="password" id="login-senha" placeholder="••••••••" onkeydown="if(event.key==='Enter')fazerLogin()"></div>
+      <div class="login-erro" id="login-erro"><i class="ti ti-alert-circle"></i><span id="login-erro-msg">Email ou senha incorretos.</span></div>
+      <button class="login-btn" id="login-btn" onclick="fazerLogin()">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-logo">♥ Amora Gestão</div>
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loading-text">Verificando acesso...</div>
+</div>
+
+<nav class="nav">
+  <div class="nav-logo"><div class="dot"><i class="ti ti-heart"></i></div><span>Amora <em>Gestão</em></span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab dona-only" onclick="goPage('painel')" id="tab-painel"><i class="ti ti-chart-bar"></i> Painel</button>
+    <button class="nav-tab active" onclick="goPage('estoque')" id="tab-estoque"><i class="ti ti-package"></i> Estoque</button>
+    <button class="nav-tab" onclick="goPage('pedidos')" id="tab-pedidos"><i class="ti ti-shopping-cart"></i> Pedidos <span class="nbadge" id="badge-pedidos">0</span></button>
+    <button class="nav-tab dona-only" onclick="goPage('consig')" id="tab-consig"><i class="ti ti-inbox"></i> Consignação <span class="nbadge" id="badge-consig">0</span></button>
+  </div>
+  <div class="nav-right">
+    <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-text">Conectado</span></div>
+    <div class="user-info">
+      <div class="user-avatar" id="user-avatar" onclick="openModal('modal-conta')" title="Minha conta">?</div>
+      <span id="user-email" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <span id="user-perfil-badge"></span>
+    </div>
+    <button class="btn-logout" onclick="fazerLogout()"><i class="ti ti-logout" style="font-size:13px"></i> Sair</button>
+  </div>
+</nav>
+
+<!-- PAINEL -->
+<div class="page dona-only" id="page-painel">
+  <div class="painel-filtros">
+    <label>Período</label>
+    <select id="painel-mes" onchange="renderPainel()"></select>
+    <select id="painel-ano" onchange="renderPainel()"></select>
+    <button class="btn-ghost" onclick="setPainelHoje()"><i class="ti ti-calendar"></i> Mês atual</button>
+  </div>
+  <div class="painel-grid" id="painel-metricas"></div>
+  <div class="painel-row">
+    <div class="painel-box"><h4>Vendas por canal</h4><div id="painel-canais"></div></div>
+    <div class="painel-box"><h4>Faturamento mensal (últimos 6 meses)</h4><canvas id="chart-vendas" height="180"></canvas></div>
+  </div>
+  <div class="painel-row">
+    <div class="painel-box"><h4>Pedidos recentes do período</h4><div id="painel-pedidos-recentes"></div></div>
+    <div class="painel-box"><h4>Consignações do período</h4><div id="painel-consig-recentes"></div></div>
+  </div>
+</div>
+
+<!-- ESTOQUE -->
+<div class="page active" id="page-estoque">
+  <div class="stats-grid" id="stats-estoque"></div>
+  <div class="section-header">
+    <span class="section-title">Produtos em estoque</span>
+    <div style="display:flex;gap:8px">
+      <button class="btn-ghost btn-sm dona-only" onclick="openModal('modal-importar')"><i class="ti ti-file-import"></i> Importar planilha</button>
+      <button class="btn-ghost btn-sm dona-only" onclick="baixarModelo()"><i class="ti ti-download"></i> Baixar modelo</button>
+      <button class="btn-primary btn-sm" onclick="openModal('modal-produto')"><i class="ti ti-plus"></i> Adicionar produto</button>
+    </div>
+  </div>
+  <div class="cat-tabs" id="cat-tabs-estoque"></div>
+  <div class="filters">
+    <input type="text" id="search-estoque" placeholder="🔍 Buscar produto..." oninput="renderEstoque()">
+    <select id="filter-mes-estoque" onchange="renderEstoque()"><option value="">Todos os meses</option></select>
+    <select id="filter-status-estoque" onchange="renderEstoque()">
+      <option value="">Todos os estoques</option>
+      <option value="ok">Ok (mais de 5)</option>
+      <option value="baixo">Baixo (1–5)</option>
+      <option value="zerado">Zerado</option>
+    </select>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th style="width:30%">Produto</th><th style="width:12%">Categoria</th>
+        <th style="width:11%">Estoque</th><th style="width:10%">Preço</th>
+        <th style="width:10%">Canal</th><th style="width:10%">Entrada</th><th style="width:17%">Ações</th>
+      </tr></thead>
+      <tbody id="tbody-estoque"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PEDIDOS -->
+<div class="page" id="page-pedidos">
+  <div class="stats-grid" id="stats-pedidos"></div>
+  <div class="section-header">
+    <span class="section-title">Pedidos recebidos</span>
+    <button class="btn-primary btn-sm" onclick="abrirNovoPedido()"><i class="ti ti-plus"></i> Registrar pedido</button>
+  </div>
+  <div class="filters">
+    <input type="text" id="search-pedidos" placeholder="🔍 Buscar cliente ou produto..." oninput="renderPedidos()">
+    <select id="filter-mes-pedidos" onchange="renderPedidos()"><option value="">Todos os meses</option></select>
+    <select id="filter-canal" onchange="renderPedidos()">
+      <option value="">Todos os canais</option>
+      <option value="site">Site</option><option value="whatsapp">WhatsApp</option>
+      <option value="instagram">Instagram</option><option value="loja">Loja física</option>
+    </select>
+    <select id="filter-status-pedido" onchange="renderPedidos()">
+      <option value="">Todos os status</option>
+      <option value="pendente">Pendente</option><option value="confirmado">Confirmado</option>
+      <option value="enviado">Enviado</option><option value="cancelado">Cancelado</option>
+    </select>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th style="width:5%">#</th><th style="width:14%">Cliente</th>
+        <th style="width:24%">Produtos</th><th style="width:9%">Canal</th>
+        <th style="width:9%">Valor</th><th style="width:11%">Status</th>
+        <th style="width:10%">Data</th><th style="width:18%">Ações</th>
+      </tr></thead>
+      <tbody id="tbody-pedidos"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CONSIGNAÇÃO (dona only) -->
+<div class="page dona-only" id="page-consig">
+  <div class="stats-grid" id="stats-consig"></div>
+  <div class="section-header">
+    <span class="section-title">Propostas de consignação</span>
+    <button class="btn-primary btn-sm" onclick="openModal('modal-consig')"><i class="ti ti-plus"></i> Nova proposta</button>
+  </div>
+  <div class="filters">
+    <input type="text" id="search-consig" placeholder="🔍 Buscar por nome ou item..." oninput="renderConsig()">
+    <select id="filter-mes-consig" onchange="renderConsig()"><option value="">Todos os meses</option></select>
+    <select id="filter-status-consig" onchange="renderConsig()">
+      <option value="">Todos os status</option>
+      <option value="avaliando">Avaliando</option><option value="aceito">Aceito</option><option value="recusado">Recusado</option>
+    </select>
+  </div>
+  <div id="list-consig"></div>
+</div>
+
+<!-- MODAL PRODUTO -->
+<div class="modal-bg" id="modal-produto">
+  <div class="modal">
+    <h3 id="modal-produto-title">Adicionar produto</h3>
+    <input type="hidden" id="prod-edit-id"><input type="hidden" id="prod-imagem-url">
+    <div class="form-row">
+      <label>Foto do produto</label>
+      <div class="foto-upload-area" id="foto-upload-area" onclick="document.getElementById('prod-foto-input').click()">
+        <i class="ti ti-photo" id="foto-icon"></i><span id="foto-label">Clique para escolher uma foto</span>
+        <img id="foto-preview" class="foto-preview" style="display:none">
+      </div>
+      <div class="foto-progress" id="foto-progress"><div class="foto-progress-bar" id="foto-progress-bar"></div></div>
+      <button type="button" id="btn-remover-foto" onclick="removerFoto()" style="display:none;margin-top:6px;width:100%" class="btn-ghost"><i class="ti ti-trash"></i> Remover foto</button>
+      <input type="file" id="prod-foto-input" accept="image/*" style="display:none" onchange="handleFotoChange(this)">
+    </div>
+    <div class="form-row"><label>Nome do produto</label><input type="text" id="prod-nome" placeholder="ex: One Piece Vol. 1"></div>
+    <div class="form-cols">
+      <div class="form-row"><label>Categoria</label>
+        <select id="prod-cat">
+          <option value="manga">Mangá</option><option value="pokemon">Pokémon</option><option value="funko">Funko Pop</option>
+          <option value="tinytoy">Tiny Toy</option><option value="yugioh">Yu-Gi-Oh</option><option value="camisa">Camisa</option><option value="outro">Outro</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Quantidade</label><input type="number" id="prod-qtd" min="0" placeholder="0"></div>
+    </div>
+    <div class="form-cols">
+      <div class="form-row"><label>Preço de venda (R$)</label><input type="number" id="prod-preco" step="0.01" placeholder="0,00"></div>
+      <div class="form-row"><label>Canal de venda</label>
+        <select id="prod-canal"><option value="site">Site</option><option value="loja">Loja física</option><option value="ambos">Site + Loja</option></select>
+      </div>
+    </div>
+    <div class="form-row"><label>Data de entrada</label><input type="date" id="prod-data"></div>
+    <div class="form-row"><label>Observações</label><textarea id="prod-obs" placeholder="Volume, edição, condição, variações..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-produto')">Cancelar</button>
+      <button class="btn-primary" id="btn-salvar-produto" onclick="saveProduto()"><i class="ti ti-check"></i> Salvar produto</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PEDIDO -->
+<div class="modal-bg" id="modal-pedido">
+  <div class="modal">
+    <h3 id="modal-pedido-title">Registrar pedido</h3>
+    <input type="hidden" id="ped-edit-id"><input type="hidden" id="ped-status-anterior">
+    <div class="form-cols">
+      <div class="form-row"><label>Cliente</label><input type="text" id="ped-cliente" placeholder="Nome do cliente"></div>
+      <div class="form-row"><label>Canal de origem</label>
+        <select id="ped-canal"><option value="whatsapp">WhatsApp</option><option value="instagram">Instagram</option><option value="site">Site</option><option value="loja">Loja física</option></select>
+      </div>
+    </div>
+    <div class="itens-section">
+      <h4><i class="ti ti-shopping-bag" style="font-size:13px;vertical-align:-1px"></i> Itens do pedido</h4>
+      <div class="alerta-estoque" id="alerta-estoque"><i class="ti ti-alert-triangle"></i><span id="alerta-estoque-msg"></span></div>
+      <div id="itens-lista"></div>
+      <button type="button" class="btn-ghost" style="width:100%;justify-content:center;margin-top:4px" onclick="addItemRow()"><i class="ti ti-plus"></i> Adicionar item</button>
+      <div class="itens-resumo"><span style="color:var(--text2);font-size:12px">Total calculado</span><strong id="itens-total">R$ 0,00</strong></div>
+    </div>
+    <div class="form-row"><label>Observações / item avulso</label><textarea id="ped-obs" placeholder="Produtos sem cadastro, combos, instruções de entrega..."></textarea></div>
+    <div class="form-cols">
+      <div class="form-row"><label>Status</label>
+        <select id="ped-status" onchange="checkStatusChange()">
+          <option value="pendente">Pendente</option><option value="confirmado">Confirmado — baixa estoque</option>
+          <option value="enviado">Enviado</option><option value="cancelado">Cancelado — devolve estoque</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Data do pedido</label><input type="date" id="ped-data"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-pedido')">Cancelar</button>
+      <button class="btn-primary" id="btn-salvar-pedido" onclick="savePedido()"><i class="ti ti-check"></i> Salvar pedido</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONSIG -->
+<div class="modal-bg" id="modal-consig">
+  <div class="modal">
+    <h3 id="modal-consig-title">Nova proposta de consignação</h3>
+    <input type="hidden" id="con-edit-id">
+    <div class="form-cols">
+      <div class="form-row"><label>Nome do vendedor</label><input type="text" id="con-nome" placeholder="Nome completo"></div>
+      <div class="form-row"><label>Contato (email/WhatsApp)</label><input type="text" id="con-contato" placeholder="email ou número"></div>
+    </div>
+    <div class="form-row"><label>Itens propostos</label><textarea id="con-itens" placeholder="Descreva os produtos: tipo, título, quantidade, condição..."></textarea></div>
+    <div class="form-cols">
+      <div class="form-row"><label>Valor pedido (R$)</label><input type="number" id="con-valor" step="0.01" placeholder="Opcional"></div>
+      <div class="form-row"><label>Status</label>
+        <select id="con-status"><option value="avaliando">Avaliando</option><option value="aceito">Aceito</option><option value="recusado">Recusado</option></select>
+      </div>
+    </div>
+    <div class="form-row"><label>Data da proposta</label><input type="date" id="con-data"></div>
+    <div class="form-row"><label>Notas internas</label><textarea id="con-notas" placeholder="Avaliação, motivo de aceite ou recusa, valor negociado..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-consig')">Cancelar</button>
+      <button class="btn-primary" onclick="saveConsig()"><i class="ti ti-check"></i> Salvar proposta</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MINHA CONTA (alterar senha + perfil) -->
+<div class="modal-bg" id="modal-conta">
+  <div class="modal">
+    <h3>Minha conta</h3>
+    <div style="display:flex;align-items:center;gap:12px;background:var(--surface2);border-radius:var(--radius);padding:12px 14px;margin-bottom:1.25rem">
+      <div style="width:42px;height:42px;border-radius:50%;background:var(--amora-light);border:1px solid var(--amora2);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--amora-dark)" id="conta-avatar">?</div>
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--text)" id="conta-email"></div>
+        <div id="conta-perfil-info" style="margin-top:3px"></div>
+      </div>
+    </div>
+    <h3 style="font-size:14px;margin-bottom:14px">Alterar senha</h3>
+    <div class="form-row"><label>Nova senha</label><input type="password" id="nova-senha" placeholder="Mínimo 6 caracteres"></div>
+    <div class="form-row"><label>Confirmar nova senha</label><input type="password" id="confirmar-senha" placeholder="Repita a nova senha"></div>
+    <div class="login-erro" id="senha-erro" style="margin-bottom:10px"><i class="ti ti-alert-circle"></i><span id="senha-erro-msg"></span></div>
+    <div id="senha-sucesso" style="display:none;background:#EAF3DE;border:1px solid #8BC34A;border-radius:var(--radius);padding:8px 12px;font-size:13px;color:#27500A;margin-bottom:10px;align-items:center;gap:6px">
+      <i class="ti ti-check"></i> Senha alterada com sucesso!
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-conta')">Fechar</button>
+      <button class="btn-primary" id="btn-salvar-senha" onclick="alterarSenha()"><i class="ti ti-lock"></i> Alterar senha</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IMPORTAR PLANILHA -->
+<div class="modal-bg" id="modal-importar">
+  <div class="modal">
+    <h3>Importar planilha de produtos</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:1rem">Suba uma planilha Excel (.xlsx) com os produtos. Use o botão <strong>"Baixar modelo"</strong> para ver o formato correto.</p>
+    <div class="import-area" id="import-area" onclick="document.getElementById('import-input').click()">
+      <i class="ti ti-file-spreadsheet"></i>
+      <span id="import-label" style="font-size:13px;color:var(--text2)">Clique para selecionar o arquivo Excel (.xlsx)</span>
+    </div>
+    <input type="file" id="import-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportFile(this)">
+    <div id="import-preview" style="display:none">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin:10px 0 6px;text-transform:uppercase;letter-spacing:0.04em">Preview — primeiros 5 produtos</div>
+      <div class="import-preview" id="import-preview-list"></div>
+      <div style="margin-top:8px;font-size:13px;color:var(--text2)">Total: <strong id="import-total">0</strong> produtos encontrados</div>
+    </div>
+    <div id="import-erro" style="display:none;background:#FCEBEB;border:1px solid #F09595;border-radius:var(--radius);padding:8px 12px;font-size:13px;color:#791F1F;margin-top:10px"></div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-importar');limparImport()">Cancelar</button>
+      <button class="btn-primary" id="btn-importar" onclick="confirmarImport()" disabled><i class="ti ti-check"></i> Importar produtos</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const {createClient}=supabase;
+const SB=createClient('https://tpjautfrftepviovszgr.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRwamF1dGZyZnRlcHZpb3ZzemdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MzgyNzEsImV4cCI6MjA5NjUxNDI3MX0._nA2P6umMiAc3S1hkg6hCmNKk6hyKK_bZrcIC3sM2l4');
+const SUPA_URL='https://tpjautfrftepviovszgr.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRwamF1dGZyZnRlcHZpb3ZzemdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MzgyNzEsImV4cCI6MjA5NjUxNDI3MX0._nA2P6umMiAc3S1hkg6hCmNKk6hyKK_bZrcIC3sM2l4';
+const BUCKET='Produtos';
+const STORAGE_URL=`${SUPA_URL}/storage/v1/object/${BUCKET}`;
+const STORAGE_PUBLIC=`${SUPA_URL}/storage/v1/object/public/${BUCKET}`;
+const H={'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Prefer':'return=representation'};
+const HU={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
+
+async function dbGet(t,q=''){const r=await fetch(`${SUPA_URL}/rest/v1/${t}?order=id.asc${q}`,{headers:H});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function dbInsert(t,d){const r=await fetch(`${SUPA_URL}/rest/v1/${t}`,{method:'POST',headers:H,body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function dbUpdate(t,id,d){const r=await fetch(`${SUPA_URL}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:H,body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function dbDelete(t,id){const r=await fetch(`${SUPA_URL}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:H});if(!r.ok)throw new Error(await r.text());}
+async function uploadFoto(file){const ext=file.name.split('.').pop();const n=`produto-${Date.now()}.${ext}`;const r=await fetch(`${STORAGE_URL}/${n}`,{method:'POST',headers:{...HU,'Content-Type':file.type,'x-upsert':'true'},body:file});if(!r.ok)throw new Error('Erro no upload');return`${STORAGE_PUBLIC}/${n}`;}
+async function deleteFotoStorage(url){if(!url)return;try{const n=url.split(`/${BUCKET}/`)[1];if(n)await fetch(`${SUPA_URL}/storage/v1/object/${BUCKET}/${n}`,{method:'DELETE',headers:HU});}catch(e){}}
+
+let produtos=[],pedidos=[],consigs=[],pedidoItens={};
+let activeCatFilter='todos',chartVendas=null;
+let perfilAtual='funcionaria',userAtual=null;
+
+const CATS={manga:'Mangá',pokemon:'Pokémon',funko:'Funko Pop',tinytoy:'Tiny Toy',yugioh:'Yu-Gi-Oh',camisa:'Camisa',outro:'Outro'};
+const CANAIS={site:'Site',whatsapp:'WhatsApp',instagram:'Instagram',loja:'Loja',ambos:'Site+Loja'};
+const STATUS_PED={pendente:'Pendente',confirmado:'Confirmado',enviado:'Enviado',cancelado:'Cancelado'};
+const STATUS_CON={avaliando:'Avaliando',aceito:'Aceito',recusado:'Recusado'};
+const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+function setSyncing(v){const d=document.getElementById('sync-dot'),t=document.getElementById('sync-text');d.className='sync-dot'+(v?' loading':'');t.textContent=v?'Sincronizando...':'Conectado';}
+function setSyncError(){document.getElementById('sync-dot').className='sync-dot error';document.getElementById('sync-text').textContent='Erro de conexão';}
+function toast(msg,type='success'){const el=document.getElementById('toast');el.textContent=msg;el.className=`toast ${type} show`;setTimeout(()=>el.classList.remove('show'),3000);}
+function fmtMoney(v){if(!v&&v!==0)return'—';return'R$ '+parseFloat(v).toFixed(2).replace('.',',');}
+function fmtDate(d){if(!d)return'—';const[y,m,day]=d.split('-');return`${day}/${m}/${y}`;}
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function catBadge(c){return`<span class="badge badge-${c}">${CATS[c]||c}</span>`;}
+function stockBadge(q){if(q==0)return`<span class="badge badge-zerado">Zerado</span>`;if(q<=5)return`<span class="badge badge-baixo">Baixo</span>`;return`<span class="badge badge-ok">Ok</span>`;}
+function statusPedBadge(s){return`<span class="badge badge-${s}">${STATUS_PED[s]||s}</span>`;}
+function statusConBadge(s){return`<span class="badge badge-${s}">${STATUS_CON[s]||s}</span>`;}
+function thumbHtml(img){if(img)return`<img class="prod-thumb" src="${img}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="prod-thumb-placeholder" style="display:none"><i class="ti ti-photo" style="font-size:14px;color:var(--text3)"></i></div>`;return`<div class="prod-thumb-placeholder"><i class="ti ti-photo" style="font-size:14px;color:var(--text3)"></i></div>`;}
+function updateBadges(){document.getElementById('badge-pedidos').textContent=pedidos.filter(p=>p.status==='pendente').length;document.getElementById('badge-consig').textContent=consigs.filter(c=>c.status==='avaliando').length;}
+function buildMesOptions(id,campo,dados){const sel=document.getElementById(id);const v=sel.value;const ms=[...new Set(dados.map(d=>d[campo]?.substring(0,7)).filter(Boolean))].sort().reverse();sel.innerHTML='<option value="">Todos os meses</option>'+ms.map(m=>{const[y,mo]=m.split('-');return`<option value="${m}">${MESES[parseInt(mo)-1]} ${y}</option>`;}).join('');if(v)sel.value=v;}
+
+// ============ PERFIL / ACESSO ============
+function aplicarPerfil(perfil) {
+  perfilAtual = perfil;
+  const isDona = perfil === 'dona';
+
+  // mostra/esconde abas e pages exclusivas da dona
+  document.querySelectorAll('.dona-only').forEach(el => {
+    el.style.display = isDona ? '' : 'none';
+  });
+
+  // badge de perfil na nav
+  document.getElementById('user-perfil-badge').innerHTML = isDona
+    ? '<span class="badge badge-dona" style="font-size:11px">Dona</span>'
+    : '<span class="badge badge-funcionaria" style="font-size:11px">Funcionária</span>';
+
+  // se funcionária está na página do painel ou consig, redireciona para estoque
+  const pagAtual = document.querySelector('.page.active')?.id;
+  if (!isDona && (pagAtual === 'page-painel' || pagAtual === 'page-consig')) {
+    goPage('estoque');
+  }
+
+  // funcionária não vê preço na tabela de pedidos
+  if (!isDona) {
+    document.querySelectorAll('.col-valor-pedido').forEach(el => el.style.display = 'none');
+  }
+}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+// ============ AUTH ============
+async function fazerLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const senha=document.getElementById('login-senha').value;
+  const btn=document.getElementById('login-btn');
+  const erro=document.getElementById('login-erro');
+  if(!email||!senha){mostrarErroLogin('Preencha email e senha.');return;}
+  btn.disabled=true;btn.textContent='Entrando...';erro.classList.remove('show');
+  const{error}=await SB.auth.signInWithPassword({email,password:senha});
+  if(error){mostrarErroLogin('Email ou senha incorretos.');btn.disabled=false;btn.textContent='Entrar';}
+}
+function mostrarErroLogin(msg){const e=document.getElementById('login-erro');document.getElementById('login-erro-msg').textContent=msg;e.classList.add('show');}
+async function fazerLogout(){await SB.auth.signOut();document.getElementById('login-screen').classList.remove('hidden');document.getElementById('login-email').value='';document.getElementById('login-senha').value='';document.getElementById('login-btn').disabled=false;document.getElementById('login-btn').textContent='Entrar';}
+
+async function mostrarUsuario(user){
+  userAtual=user;
+  const email=user.email||'';
+  document.getElementById('user-email').textContent=email;
+  document.getElementById('user-avatar').textContent=email.charAt(0).toUpperCase();
+  document.getElementById('conta-email').textContent=email;
+  document.getElementById('conta-avatar').textContent=email.charAt(0).toUpperCase();
+
+  // busca perfil
+  try{
+    const r=await fetch(`${SUPA_URL}/rest/v1/perfis?id=eq.${user.id}`,{headers:H});
+    const data=await r.json();
+    const perfil=data[0]?.perfil||'funcionaria';
+    aplicarPerfil(perfil);
+    document.getElementById('conta-perfil-info').innerHTML=
+      perfil==='dona'
+        ? '<span class="badge badge-dona">Dona — acesso completo</span>'
+        : '<span class="badge badge-funcionaria">Funcionária — estoque e pedidos</span>';
+  }catch(e){aplicarPerfil('funcionaria');}
+}
+
+// ============ ALTERAR SENHA ============
+async function alterarSenha(){
+  const nova=document.getElementById('nova-senha').value;
+  const confirmar=document.getElementById('confirmar-senha').value;
+  const erro=document.getElementById('senha-erro');
+  const sucesso=document.getElementById('senha-sucesso');
+  erro.classList.remove('show');sucesso.style.display='none';
+  if(!nova||nova.length<6){document.getElementById('senha-erro-msg').textContent='A senha deve ter pelo menos 6 caracteres.';erro.classList.add('show');return;}
+  if(nova!==confirmar){document.getElementById('senha-erro-msg').textContent='As senhas não coincidem.';erro.classList.add('show');return;}
+  const btn=document.getElementById('btn-salvar-senha');
+  btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Salvando...';
+  const{error}=await SB.auth.updateUser({password:nova});
+  btn.disabled=false;btn.innerHTML='<i class="ti ti-lock"></i> Alterar senha';
+  if(error){document.getElementById('senha-erro-msg').textContent='Erro ao alterar senha. Tente novamente.';erro.classList.add('show');}
+  else{sucesso.style.display='flex';document.getElementById('nova-senha').value='';document.getElementById('confirmar-senha').value='';toast('Senha alterada com sucesso!');}
+}
+
+// ============ IMPORTAR PLANILHA ============
+let importData=[];
+function handleImportFile(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(!rows.length){showImportErro('Planilha vazia ou formato inválido.');return;}
+      // normaliza colunas
+      importData=rows.map(r=>({
+        nome:String(r.nome||r.Produto||r.PRODUTO||r.Nome||'').trim(),
+        cat:String(r.cat||r.Categoria||r.categoria||'outro').trim().toLowerCase(),
+        qtd:parseInt(r.qtd||r.Quantidade||r.quantidade||0)||0,
+        preco:parseFloat(String(r.preco||r.Preço||r.preco||0).replace(',','.'))||0,
+        canal:String(r.canal||r.Canal||'loja').trim().toLowerCase(),
+        obs:String(r.obs||r.Observacoes||r.observações||'').trim(),
+        data_entrada:todayStr()
+      })).filter(r=>r.nome);
+      if(!importData.length){showImportErro('Nenhum produto válido encontrado. Verifique se a coluna "nome" existe.');return;}
+      document.getElementById('import-erro').style.display='none';
+      document.getElementById('import-label').textContent=`✓ ${file.name} — ${importData.length} produtos encontrados`;
+      document.getElementById('import-total').textContent=importData.length;
+      const preview=importData.slice(0,5).map(r=>`<div class="import-row"><span>${r.nome}</span><span>${CATS[r.cat]||r.cat} · ${r.qtd} un · ${fmtMoney(r.preco)}</span></div>`).join('');
+      document.getElementById('import-preview-list').innerHTML=preview;
+      document.getElementById('import-preview').style.display='block';
+      document.getElementById('btn-importar').disabled=false;
+    }catch(err){showImportErro('Erro ao ler o arquivo: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+function showImportErro(msg){const el=document.getElementById('import-erro');el.textContent=msg;el.style.display='block';}
+async function confirmarImport(){
+  if(!importData.length)return;
+  const btn=document.getElementById('btn-importar');
+  btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Importando...';
+  setSyncing(true);
+  try{
+    const res=await dbInsert('produtos',importData);
+    if(Array.isArray(res))produtos.push(...res);
+    toast(`${importData.length} produtos importados com sucesso!`);
+    closeModal('modal-importar');limparImport();
+    buildMesOptions('filter-mes-estoque','data_entrada',produtos);renderEstoque();
+  }catch(e){showImportErro('Erro ao importar: '+e.message);}
+  finally{setSyncing(false);btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> Importar produtos';}
+}
+function limparImport(){importData=[];document.getElementById('import-input').value='';document.getElementById('import-preview').style.display='none';document.getElementById('import-erro').style.display='none';document.getElementById('import-label').textContent='Clique para selecionar o arquivo Excel (.xlsx)';document.getElementById('btn-importar').disabled=true;}
+
+function baixarModelo(){
+  const ws=XLSX.utils.aoa_to_sheet([
+    ['nome','cat','qtd','preco','canal','obs'],
+    ['One Piece Vol. 1','manga',3,29.90,'ambos',''],
+    ['Funko Pop Naruto','funko',2,89.90,'loja',''],
+    ['Tiny Toy Capivara','tinytoy',10,6.00,'ambos',''],
+    ['Camisa Demon Slayer','camisa',5,79.90,'ambos','P ao XG'],
+  ]);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Produtos');
+  XLSX.writeFile(wb,'modelo-importacao-amora.xlsx');
+}
+
+function goPage(p){
+  // bloqueia acesso a páginas restritas para funcionária
+  if(perfilAtual!=='dona'&&(p==='painel'||p==='consig')){toast('Acesso restrito.','error');return;}
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(el=>el.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  document.getElementById('tab-'+p).classList.add('active');
+  if(p==='painel')renderPainel();
+}
+
+// ============ ITENS PEDIDO ============
+let itemRowCount=0;
+function addItemRow(prodId='',qtd=1,preco=''){
+  itemRowCount++;const id=itemRowCount;
+  const div=document.createElement('div');div.id=`item-row-${id}`;div.className='item-row';
+  const opts=produtos.map(p=>`<option value="${p.id}" data-preco="${p.preco}" data-estoque="${p.qtd}" ${p.id==prodId?'selected':''}>${p.nome} (${p.qtd} em estoque)</option>`).join('');
+  div.innerHTML=`<div><select onchange="onItemProdChange(${id})" id="item-prod-${id}"><option value="">— selecionar produto —</option>${opts}</select><div class="item-estoque-info" id="item-info-${id}"></div></div><input type="number" id="item-qtd-${id}" min="1" value="${qtd}" oninput="calcTotal()"><input type="number" id="item-preco-${id}" step="0.01" value="${preco}" oninput="calcTotal()"><button type="button" class="btn-danger" onclick="removeItemRow(${id})"><i class="ti ti-x"></i></button>`;
+  document.getElementById('itens-lista').appendChild(div);
+  if(prodId)onItemProdChange(id);calcTotal();
+}
+function removeItemRow(id){document.getElementById(`item-row-${id}`)?.remove();calcTotal();}
+function onItemProdChange(id){const sel=document.getElementById(`item-prod-${id}`);const opt=sel.options[sel.selectedIndex];const preco=opt?.dataset?.preco||'';const est=parseInt(opt?.dataset?.estoque||0);document.getElementById(`item-preco-${id}`).value=preco?parseFloat(preco).toFixed(2):'';const info=document.getElementById(`item-info-${id}`);if(opt?.value){if(est===0)info.innerHTML=`<span class="estoque-zero">⚠ Sem estoque</span>`;else if(est<=5)info.innerHTML=`<span class="estoque-baixo">⚠ Estoque baixo: ${est} un</span>`;else info.innerHTML=`<span class="estoque-ok">✓ ${est} em estoque</span>`;}else info.innerHTML='';calcTotal();}
+function calcTotal(){let t=0;document.querySelectorAll('[id^="item-row-"]').forEach(row=>{const id=row.id.replace('item-row-','');const q=parseInt(document.getElementById(`item-qtd-${id}`)?.value)||0;const p=parseFloat(document.getElementById(`item-preco-${id}`)?.value)||0;t+=q*p;});document.getElementById('itens-total').textContent=fmtMoney(t);}
+function getItensForm(){const itens=[];document.querySelectorAll('[id^="item-row-"]').forEach(row=>{const id=row.id.replace('item-row-','');const prodId=document.getElementById(`item-prod-${id}`)?.value;const qtd=parseInt(document.getElementById(`item-qtd-${id}`)?.value)||0;const preco=parseFloat(document.getElementById(`item-preco-${id}`)?.value)||0;const p=produtos.find(x=>x.id==prodId);if(qtd>0)itens.push({produto_id:prodId?parseInt(prodId):null,nome_produto:p?p.nome:'Item avulso',quantidade:qtd,preco_unitario:preco});});return itens;}
+function verificarEstoque(itens,ignorarId=null){const prob=[];itens.forEach(it=>{if(!it.produto_id)return;const p=produtos.find(x=>x.id===it.produto_id);if(!p)return;let est=p.qtd;if(ignorarId){const ia=(pedidoItens[ignorarId]||[]).find(x=>x.produto_id===it.produto_id);if(ia)est+=ia.quantidade;}if(est<it.quantidade)prob.push(`${p.nome}: precisa de ${it.quantidade}, tem ${est}`);});return prob;}
+function checkStatusChange(){const s=document.getElementById('ped-status').value;const al=document.getElementById('alerta-estoque');if(s==='confirmado'){const editId=parseInt(document.getElementById('ped-edit-id').value)||0;const sAnt=document.getElementById('ped-status-anterior').value;if(sAnt==='confirmado')return;const prob=verificarEstoque(getItensForm(),editId&&sAnt==='confirmado'?editId:null);if(prob.length){al.classList.add('show');document.getElementById('alerta-estoque-msg').textContent='Estoque insuficiente: '+prob.join(' | ');}else al.classList.remove('show');}else al.classList.remove('show');}
+
+// ============ PAINEL ============
+function setPainelHoje(){const n=new Date();document.getElementById('painel-mes').value=String(n.getMonth()+1).padStart(2,'0');document.getElementById('painel-ano').value=n.getFullYear();renderPainel();}
+function initPainelFiltros(){const n=new Date();const anos=[...new Set([...pedidos.map(p=>p.data_pedido?.substring(0,4)),...consigs.map(c=>c.data_proposta?.substring(0,4))].filter(Boolean))].sort().reverse();if(!anos.includes(String(n.getFullYear())))anos.unshift(String(n.getFullYear()));document.getElementById('painel-ano').innerHTML=anos.map(a=>`<option value="${a}">${a}</option>`).join('');document.getElementById('painel-mes').innerHTML=MESES.map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');document.getElementById('painel-mes').value=String(n.getMonth()+1).padStart(2,'0');document.getElementById('painel-ano').value=n.getFullYear();}
+function renderPainel(){const mes=document.getElementById('painel-mes')?.value||'';const ano=document.getElementById('painel-ano')?.value||'';const pref=`${ano}-${mes}`;const pedsPer=pedidos.filter(p=>p.data_pedido?.startsWith(pref));const pedsOk=pedsPer.filter(p=>p.status!=='cancelado');const fat=pedsOk.reduce((a,p)=>a+(parseFloat(p.valor)||0),0);const ticket=pedsOk.length?fat/pedsOk.length:0;const pend=pedsPer.filter(p=>p.status==='pendente').length;const cPer=consigs.filter(c=>c.data_proposta?.startsWith(pref));const prPer=produtos.filter(p=>p.data_entrada?.startsWith(pref));document.getElementById('painel-metricas').innerHTML=`<div class="painel-card"><div class="plabel"><i class="ti ti-cash" style="font-size:13px"></i> Faturamento</div><div class="pvalue" style="font-size:20px">${fmtMoney(fat)}</div><div class="psub">confirmados/enviados</div></div><div class="painel-card"><div class="plabel"><i class="ti ti-shopping-cart" style="font-size:13px"></i> Pedidos</div><div class="pvalue">${pedsPer.length}</div><div class="psub">${pend} pendentes</div></div><div class="painel-card"><div class="plabel"><i class="ti ti-receipt" style="font-size:13px"></i> Ticket médio</div><div class="pvalue" style="font-size:20px">${fmtMoney(ticket)}</div></div><div class="painel-card"><div class="plabel"><i class="ti ti-inbox" style="font-size:13px"></i> Consignações</div><div class="pvalue">${cPer.length}</div><div class="psub">${cPer.filter(c=>c.status==='avaliando').length} avaliando</div></div><div class="painel-card"><div class="plabel"><i class="ti ti-package" style="font-size:13px"></i> Produtos entrados</div><div class="pvalue">${prPer.length}</div></div>`;const cc={whatsapp:0,instagram:0,site:0,loja:0};pedsPer.forEach(p=>{if(cc[p.canal]!==undefined)cc[p.canal]++;});const mx=Math.max(...Object.values(cc),1);document.getElementById('painel-canais').innerHTML=Object.entries(cc).map(([c,n])=>`<div class="canal-item"><span style="width:80px;font-size:12px;color:var(--text2)">${CANAIS[c]||c}</span><div class="canal-bar-wrap"><div class="canal-bar" style="width:${Math.round(n/mx*100)}%"></div></div><span style="font-size:13px;font-weight:700;width:24px;text-align:right">${n}</span></div>`).join('');const labels=[],valores=[];for(let i=5;i>=0;i--){const d=new Date(parseInt(ano),parseInt(mes)-1-i,1);const pr=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;labels.push(MESES[d.getMonth()].substring(0,3));valores.push(parseFloat(pedidos.filter(p=>p.data_pedido?.startsWith(pr)&&p.status!=='cancelado').reduce((a,p)=>a+(parseFloat(p.valor)||0),0).toFixed(2)));}const ctx=document.getElementById('chart-vendas').getContext('2d');if(chartVendas)chartVendas.destroy();chartVendas=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data:valores,backgroundColor:'#F4C0D1',borderColor:'#C94B7B',borderWidth:2,borderRadius:6}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{callback:v=>'R$'+v.toLocaleString('pt-BR')}},x:{grid:{display:false}}}}});const rec=pedsPer.slice(-5).reverse();document.getElementById('painel-pedidos-recentes').innerHTML=rec.length?rec.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px"><div><span style="font-weight:600">${p.cliente||'—'}</span><span style="color:var(--text3);font-size:11px;margin-left:6px">${fmtDate(p.data_pedido)}</span></div><div style="display:flex;align-items:center;gap:8px">${statusPedBadge(p.status)}<span style="font-weight:700">${fmtMoney(p.valor)}</span></div></div>`).join(''):`<div class="empty" style="padding:1.5rem"><p>Nenhum pedido no período</p></div>`;const cRec=cPer.slice(-5).reverse();document.getElementById('painel-consig-recentes').innerHTML=cRec.length?cRec.map(c=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px"><div><span style="font-weight:600">${c.nome||'—'}</span><span style="color:var(--text3);font-size:11px;margin-left:6px">${fmtDate(c.data_proposta)}</span></div><div>${statusConBadge(c.status)}</div></div>`).join(''):`<div class="empty" style="padding:1.5rem"><p>Nenhuma consignação no período</p></div>`;}
+
+// ============ ESTOQUE ============
+async function loadEstoque(){setSyncing(true);try{produtos=await dbGet('produtos');}catch(e){setSyncError();}finally{setSyncing(false);}buildMesOptions('filter-mes-estoque','data_entrada',produtos);renderEstoque();}
+function renderEstoque(){const search=(document.getElementById('search-estoque')?.value||'').toLowerCase();const fStatus=document.getElementById('filter-status-estoque')?.value||'';const fMes=document.getElementById('filter-mes-estoque')?.value||'';document.getElementById('cat-tabs-estoque').innerHTML=['todos',...Object.keys(CATS)].map(c=>{const n=c==='todos'?produtos.length:produtos.filter(p=>p.cat===c).length;return`<button class="cat-tab ${activeCatFilter===c?'active':''}" onclick="setCatFilter('${c}')">${c==='todos'?'Todos':CATS[c]} (${n})</button>`;}).join('');let prods=[...produtos];if(activeCatFilter!=='todos')prods=prods.filter(p=>p.cat===activeCatFilter);if(search)prods=prods.filter(p=>(p.nome||'').toLowerCase().includes(search));if(fStatus)prods=prods.filter(p=>{if(fStatus==='zerado')return p.qtd==0;if(fStatus==='baixo')return p.qtd>0&&p.qtd<=5;return p.qtd>5;});if(fMes)prods=prods.filter(p=>p.data_entrada?.startsWith(fMes));const total=produtos.length,zerado=produtos.filter(p=>p.qtd==0).length,baixo=produtos.filter(p=>p.qtd>0&&p.qtd<=5).length;const val=produtos.reduce((a,p)=>a+(parseFloat(p.preco)||0)*(parseInt(p.qtd)||0),0);document.getElementById('stats-estoque').innerHTML=`<div class="stat-card"><div class="slabel">Total de SKUs</div><div class="svalue">${total}</div></div><div class="stat-card"><div class="slabel">Zerados</div><div class="svalue" style="color:#A32D2D">${zerado}</div><div class="ssub">precisam de reposição</div></div><div class="stat-card"><div class="slabel">Estoque baixo</div><div class="svalue" style="color:#BA7517">${baixo}</div><div class="ssub">5 unidades ou menos</div></div><div class="stat-card"><div class="slabel">Valor em estoque</div><div class="svalue" style="font-size:18px">${fmtMoney(val)}</div></div>`;const tbody=document.getElementById('tbody-estoque');if(!prods.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty"><i class="ti ti-package"></i><p>Nenhum produto encontrado</p></div></td></tr>`;return;}tbody.innerHTML=prods.map(p=>`<tr><td><div class="prod-nome-cell">${thumbHtml(p.imagem)}<span title="${p.nome||''}" style="overflow:hidden;text-overflow:ellipsis">${p.nome||''}</span></div></td><td>${catBadge(p.cat)}</td><td><div style="display:flex;align-items:center;gap:5px"><span class="stock-num ${p.qtd==0?'stock-zero':p.qtd<=5?'stock-low':'stock-ok'}">${p.qtd}</span>${stockBadge(p.qtd)}</div></td><td>${fmtMoney(p.preco)}</td><td><span class="badge badge-canal">${CANAIS[p.canal]||p.canal||'—'}</span></td><td style="color:var(--text3);font-size:12px">${fmtDate(p.data_entrada)}</td><td><div style="display:flex;gap:4px;align-items:center"><button class="btn-ghost" onclick="editProduto(${p.id})"><i class="ti ti-edit"></i></button><button class="btn-ghost" onclick="ajustarQtd(${p.id},-1)">−1</button><button class="btn-ghost" onclick="ajustarQtd(${p.id},1)">+1</button><button class="btn-danger" onclick="deleteProduto(${p.id})"><i class="ti ti-trash"></i></button></div></td></tr>`).join('');}
+function setCatFilter(c){activeCatFilter=c;renderEstoque();}
+async function ajustarQtd(id,d){const p=produtos.find(x=>x.id===id);if(!p)return;const n=Math.max(0,(parseInt(p.qtd)||0)+d);setSyncing(true);try{await dbUpdate('produtos',id,{qtd:n});p.qtd=n;renderEstoque();}finally{setSyncing(false);}}
+function editProduto(id){const p=produtos.find(x=>x.id===id);if(!p)return;document.getElementById('prod-edit-id').value=id;document.getElementById('prod-imagem-url').value=p.imagem||'';document.getElementById('prod-nome').value=p.nome||'';document.getElementById('prod-cat').value=p.cat||'manga';document.getElementById('prod-qtd').value=p.qtd||0;document.getElementById('prod-preco').value=p.preco||'';document.getElementById('prod-canal').value=p.canal||'loja';document.getElementById('prod-obs').value=p.obs||'';document.getElementById('prod-data').value=p.data_entrada||todayStr();const pv=document.getElementById('foto-preview'),ar=document.getElementById('foto-upload-area'),br=document.getElementById('btn-remover-foto');if(p.imagem){pv.src=p.imagem;pv.style.display='block';document.getElementById('foto-icon').style.display='none';document.getElementById('foto-label').style.display='none';ar.classList.add('tem-foto');br.style.display='block';}else{pv.style.display='none';document.getElementById('foto-icon').style.display='block';document.getElementById('foto-label').style.display='block';ar.classList.remove('tem-foto');br.style.display='none';}document.getElementById('modal-produto-title').textContent='Editar produto';openModal('modal-produto');}
+async function saveProduto(){const nome=document.getElementById('prod-nome').value.trim();if(!nome)return alert('Informe o nome do produto.');const editId=parseInt(document.getElementById('prod-edit-id').value)||0;const btn=document.getElementById('btn-salvar-produto');btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Salvando...';try{let img=document.getElementById('prod-imagem-url').value||'';const fi=document.getElementById('prod-foto-input');if(fi.files[0]){if(editId){const pa=produtos.find(x=>x.id===editId);if(pa?.imagem)await deleteFotoStorage(pa.imagem);}document.getElementById('foto-progress').style.display='block';document.getElementById('foto-progress-bar').style.width='40%';img=await uploadFoto(fi.files[0]);document.getElementById('foto-progress-bar').style.width='100%';setTimeout(()=>document.getElementById('foto-progress').style.display='none',600);}const obj={nome,cat:document.getElementById('prod-cat').value,qtd:parseInt(document.getElementById('prod-qtd').value)||0,preco:parseFloat(document.getElementById('prod-preco').value)||0,canal:document.getElementById('prod-canal').value,obs:document.getElementById('prod-obs').value.trim(),imagem:img||null,data_entrada:document.getElementById('prod-data').value||todayStr()};setSyncing(true);if(editId){await dbUpdate('produtos',editId,obj);const idx=produtos.findIndex(x=>x.id===editId);if(idx>=0)produtos[idx]={...produtos[idx],...obj};toast('Produto atualizado!');}else{const res=await dbInsert('produtos',obj);produtos.push(res[0]);toast('Produto adicionado!');}closeModal('modal-produto');clearProdutoForm();buildMesOptions('filter-mes-estoque','data_entrada',produtos);renderEstoque();}catch(e){toast('Erro: '+e.message,'error');}finally{setSyncing(false);btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> Salvar produto';}}
+async function deleteProduto(id){if(!confirm('Remover este produto?'))return;const p=produtos.find(x=>x.id===id);if(p?.imagem)await deleteFotoStorage(p.imagem);setSyncing(true);try{await dbDelete('produtos',id);produtos=produtos.filter(x=>x.id!==id);toast('Produto removido.','error');renderEstoque();}finally{setSyncing(false);}}
+function handleFotoChange(input){const file=input.files[0];if(!file)return;const ar=document.getElementById('foto-upload-area'),pv=document.getElementById('foto-preview'),ic=document.getElementById('foto-icon'),lb=document.getElementById('foto-label');const rd=new FileReader();rd.onload=e=>{pv.src=e.target.result;pv.style.display='block';ic.style.display='none';lb.style.display='none';ar.classList.add('tem-foto');document.getElementById('btn-remover-foto').style.display='block';};rd.readAsDataURL(file);document.getElementById('prod-imagem-url').value='';}
+async function removerFoto(){if(!confirm('Remover a foto?'))return;const url=document.getElementById('prod-imagem-url').value,editId=parseInt(document.getElementById('prod-edit-id').value)||0;if(editId&&url){await deleteFotoStorage(url);setSyncing(true);try{await dbUpdate('produtos',editId,{imagem:null});const p=produtos.find(x=>x.id===editId);if(p)p.imagem=null;renderEstoque();toast('Foto removida!');}finally{setSyncing(false);}}limparAreaFoto();}
+function limparAreaFoto(){document.getElementById('prod-imagem-url').value='';document.getElementById('prod-foto-input').value='';document.getElementById('foto-preview').style.display='none';document.getElementById('foto-icon').style.display='block';document.getElementById('foto-label').style.display='block';document.getElementById('foto-upload-area').classList.remove('tem-foto');document.getElementById('btn-remover-foto').style.display='none';}
+function clearProdutoForm(){document.getElementById('prod-edit-id').value='';document.getElementById('modal-produto-title').textContent='Adicionar produto';['prod-nome','prod-qtd','prod-preco','prod-obs'].forEach(id=>document.getElementById(id).value='');document.getElementById('prod-data').value=todayStr();limparAreaFoto();}
+
+// ============ PEDIDOS ============
+async function loadPedidos(){setSyncing(true);try{pedidos=await dbGet('pedidos');const itens=await dbGet('pedido_itens');pedidoItens={};itens.forEach(it=>{if(!pedidoItens[it.pedido_id])pedidoItens[it.pedido_id]=[];pedidoItens[it.pedido_id].push(it);});}catch(e){setSyncError();}finally{setSyncing(false);}buildMesOptions('filter-mes-pedidos','data_pedido',pedidos);renderPedidos();updateBadges();}
+function renderPedidos(){const search=(document.getElementById('search-pedidos')?.value||'').toLowerCase();const fCanal=document.getElementById('filter-canal')?.value||'';const fStatus=document.getElementById('filter-status-pedido')?.value||'';const fMes=document.getElementById('filter-mes-pedidos')?.value||'';let peds=[...pedidos];if(search)peds=peds.filter(p=>(p.cliente||'').toLowerCase().includes(search)||(p.produto||'').toLowerCase().includes(search)||(pedidoItens[p.id]||[]).some(it=>(it.nome_produto||'').toLowerCase().includes(search)));if(fCanal)peds=peds.filter(p=>p.canal===fCanal);if(fStatus)peds=peds.filter(p=>p.status===fStatus);if(fMes)peds=peds.filter(p=>p.data_pedido?.startsWith(fMes));const total=pedidos.length,pend=pedidos.filter(p=>p.status==='pendente').length;const fat=pedidos.filter(p=>p.status!=='cancelado').reduce((a,p)=>a+(parseFloat(p.valor)||0),0);const wpp=pedidos.filter(p=>p.canal==='whatsapp').length;
+
+  const isDona=perfilAtual==='dona';
+  document.getElementById('stats-pedidos').innerHTML=`<div class="stat-card"><div class="slabel">Total de pedidos</div><div class="svalue">${total}</div></div><div class="stat-card"><div class="slabel">Pendentes</div><div class="svalue" style="color:#BA7517">${pend}</div><div class="ssub">aguardando ação</div></div>${isDona?`<div class="stat-card"><div class="slabel">Faturamento</div><div class="svalue" style="font-size:18px">${fmtMoney(fat)}</div></div>`:''}<div class="stat-card"><div class="slabel">Via WhatsApp</div><div class="svalue">${wpp}</div></div>`;
+  const tbody=document.getElementById('tbody-pedidos');if(!peds.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><i class="ti ti-shopping-cart"></i><p>Nenhum pedido encontrado</p></div></td></tr>`;return;}
+  tbody.innerHTML=peds.map(p=>{const itens=pedidoItens[p.id]||[];const itensStr=itens.length?itens.map(it=>`${it.nome_produto}(${it.quantidade}x)`).join(', '):(p.produto||'—');return`<tr><td style="color:var(--text3);font-size:11px;font-weight:700">#${p.id}</td><td title="${p.cliente||''}">${p.cliente||''}</td><td title="${itensStr}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${itensStr}</td><td><span class="badge badge-canal">${CANAIS[p.canal]||p.canal||'—'}</span></td><td class="col-valor-pedido" ${!isDona?'style="display:none"':''}>${fmtMoney(p.valor)}</td><td>${statusPedBadge(p.status)}</td><td style="color:var(--text3);font-size:12px">${fmtDate(p.data_pedido)}</td><td><div style="display:flex;gap:4px;align-items:center"><button class="btn-ghost" onclick="editPedido(${p.id})"><i class="ti ti-edit"></i></button><button class="btn-ghost" onclick="avancaStatus(${p.id})"><i class="ti ti-arrow-right"></i></button><button class="btn-danger" onclick="deletePedido(${p.id})"><i class="ti ti-trash"></i></button></div></td></tr>`;}).join('');updateBadges();}
+function abrirNovoPedido(){document.getElementById('ped-edit-id').value='';document.getElementById('ped-status-anterior').value='';document.getElementById('ped-cliente').value='';document.getElementById('ped-canal').value='whatsapp';document.getElementById('ped-obs').value='';document.getElementById('ped-status').value='pendente';document.getElementById('ped-data').value=todayStr();document.getElementById('itens-lista').innerHTML='';document.getElementById('alerta-estoque').classList.remove('show');itemRowCount=0;addItemRow();document.getElementById('modal-pedido-title').textContent='Registrar pedido';openModal('modal-pedido');}
+function editPedido(id){const p=pedidos.find(x=>x.id===id);if(!p)return;document.getElementById('ped-edit-id').value=id;document.getElementById('ped-status-anterior').value=p.status;document.getElementById('ped-cliente').value=p.cliente||'';document.getElementById('ped-canal').value=p.canal||'whatsapp';document.getElementById('ped-obs').value=p.obs||'';document.getElementById('ped-status').value=p.status||'pendente';document.getElementById('ped-data').value=p.data_pedido||todayStr();document.getElementById('itens-lista').innerHTML='';document.getElementById('alerta-estoque').classList.remove('show');itemRowCount=0;const itens=pedidoItens[id]||[];if(itens.length)itens.forEach(it=>addItemRow(it.produto_id,it.quantidade,it.preco_unitario));else addItemRow();document.getElementById('modal-pedido-title').textContent='Editar pedido';openModal('modal-pedido');}
+async function savePedido(){const cliente=document.getElementById('ped-cliente').value.trim();if(!cliente)return alert('Informe o nome do cliente.');const editId=parseInt(document.getElementById('ped-edit-id').value)||0;const novoStatus=document.getElementById('ped-status').value;const statusAnt=document.getElementById('ped-status-anterior').value;const itens=getItensForm();if(novoStatus==='confirmado'&&statusAnt!=='confirmado'){const prob=verificarEstoque(itens);if(prob.length){document.getElementById('alerta-estoque').classList.add('show');document.getElementById('alerta-estoque-msg').textContent='Estoque insuficiente: '+prob.join(' | ');toast('Estoque insuficiente!','error');return;}}const total=itens.reduce((a,it)=>a+it.quantidade*it.preco_unitario,0);const obj={cliente,canal:document.getElementById('ped-canal').value,produto:itens.map(it=>`${it.nome_produto}(${it.quantidade}x)`).join(', '),valor:parseFloat(total.toFixed(2)),status:novoStatus,obs:document.getElementById('ped-obs').value.trim(),data_pedido:document.getElementById('ped-data').value||todayStr()};const btn=document.getElementById('btn-salvar-pedido');btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Salvando...';setSyncing(true);try{let pedidoId=editId;if(editId){await dbUpdate('pedidos',editId,obj);const idx=pedidos.findIndex(x=>x.id===editId);if(idx>=0)pedidos[idx]={...pedidos[idx],...obj};}else{const res=await dbInsert('pedidos',obj);pedidoId=res[0].id;pedidos.push(res[0]);}if(editId)await fetch(`${SUPA_URL}/rest/v1/pedido_itens?pedido_id=eq.${editId}`,{method:'DELETE',headers:H});if(itens.length){await dbInsert('pedido_itens',itens.map(it=>({...it,pedido_id:pedidoId})));pedidoItens[pedidoId]=itens.map(it=>({...it,pedido_id:pedidoId}));}if(novoStatus==='confirmado'&&statusAnt!=='confirmado'){for(const it of itens){if(!it.produto_id)continue;const p=produtos.find(x=>x.id===it.produto_id);if(p){const nq=Math.max(0,p.qtd-it.quantidade);await dbUpdate('produtos',it.produto_id,{qtd:nq});p.qtd=nq;}}toast('Pedido confirmado! Estoque atualizado.');}else if(novoStatus==='cancelado'&&(statusAnt==='confirmado'||statusAnt==='enviado')){const itAnt=pedidoItens[pedidoId]||[];for(const it of itAnt){if(!it.produto_id)continue;const p=produtos.find(x=>x.id===it.produto_id);if(p){const nq=p.qtd+it.quantidade;await dbUpdate('produtos',it.produto_id,{qtd:nq});p.qtd=nq;}}toast('Pedido cancelado. Estoque devolvido.','warn');}else toast(editId?'Pedido atualizado!':'Pedido registrado!');closeModal('modal-pedido');buildMesOptions('filter-mes-pedidos','data_pedido',pedidos);renderPedidos();renderEstoque();}catch(e){toast('Erro: '+e.message,'error');}finally{setSyncing(false);btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> Salvar pedido';}}
+async function avancaStatus(id){const flow=['pendente','confirmado','enviado'];const p=pedidos.find(x=>x.id===id);if(!p)return;const idx=flow.indexOf(p.status);if(idx<0||idx>=flow.length-1)return;const novo=flow[idx+1];if(novo==='confirmado'){const prob=verificarEstoque(pedidoItens[id]||[]);if(prob.length){toast('Estoque insuficiente: '+prob.join(' | '),'error');return;}}setSyncing(true);try{await dbUpdate('pedidos',id,{status:novo});p.status=novo;if(novo==='confirmado'){const itens=pedidoItens[id]||[];for(const it of itens){if(!it.produto_id)continue;const pr=produtos.find(x=>x.id===it.produto_id);if(pr){const nq=Math.max(0,pr.qtd-it.quantidade);await dbUpdate('produtos',it.produto_id,{qtd:nq});pr.qtd=nq;}}toast(`Pedido #${id} confirmado! Estoque atualizado.`);}else toast(`Pedido #${id} → ${STATUS_PED[novo]}`);renderPedidos();renderEstoque();}finally{setSyncing(false);}}
+async function deletePedido(id){if(!confirm('Remover este pedido?'))return;const p=pedidos.find(x=>x.id===id);if(p&&(p.status==='confirmado'||p.status==='enviado')){if(!confirm('Este pedido está confirmado. Devolver itens ao estoque?'))return;const itens=pedidoItens[id]||[];setSyncing(true);try{for(const it of itens){if(!it.produto_id)continue;const pr=produtos.find(x=>x.id===it.produto_id);if(pr){const nq=pr.qtd+it.quantidade;await dbUpdate('produtos',it.produto_id,{qtd:nq});pr.qtd=nq;}}}finally{setSyncing(false);}}setSyncing(true);try{await dbDelete('pedidos',id);pedidos=pedidos.filter(x=>x.id!==id);delete pedidoItens[id];toast('Pedido removido.','error');renderPedidos();renderEstoque();}finally{setSyncing(false);}}
+
+// ============ CONSIGNAÇÃO ============
+async function loadConsig(){setSyncing(true);try{consigs=await dbGet('consig');}catch(e){setSyncError();}finally{setSyncing(false);}buildMesOptions('filter-mes-consig','data_proposta',consigs);renderConsig();updateBadges();}
+function renderConsig(){const search=(document.getElementById('search-consig')?.value||'').toLowerCase();const fStatus=document.getElementById('filter-status-consig')?.value||'';const fMes=document.getElementById('filter-mes-consig')?.value||'';let items=[...consigs];if(search)items=items.filter(c=>(c.nome||'').toLowerCase().includes(search)||(c.itens||'').toLowerCase().includes(search));if(fStatus)items=items.filter(c=>c.status===fStatus);if(fMes)items=items.filter(c=>c.data_proposta?.startsWith(fMes));const total=consigs.length,aval=consigs.filter(c=>c.status==='avaliando').length,aceito=consigs.filter(c=>c.status==='aceito').length,recusado=consigs.filter(c=>c.status==='recusado').length;document.getElementById('stats-consig').innerHTML=`<div class="stat-card"><div class="slabel">Total de propostas</div><div class="svalue">${total}</div></div><div class="stat-card"><div class="slabel">Avaliando</div><div class="svalue" style="color:#BA7517">${aval}</div></div><div class="stat-card"><div class="slabel">Aceitas</div><div class="svalue" style="color:#3B6D11">${aceito}</div></div><div class="stat-card"><div class="slabel">Recusadas</div><div class="svalue" style="color:#A32D2D">${recusado}</div></div>`;const list=document.getElementById('list-consig');if(!items.length){list.innerHTML=`<div class="empty"><i class="ti ti-inbox"></i><p>Nenhuma proposta encontrada</p></div>`;return;}list.innerHTML=items.map(c=>`<div class="consig-card"><div class="consig-header"><div><div class="consig-name">${c.nome||''}</div><div class="consig-meta"><i class="ti ti-at" style="font-size:13px"></i> ${c.contato||'—'}${c.data_proposta?` · ${fmtDate(c.data_proposta)}`:''}</div></div><div style="display:flex;align-items:center;gap:8px">${statusConBadge(c.status)}${c.valor?`<span style="font-size:12px;color:var(--text2);font-weight:600">${fmtMoney(c.valor)}</span>`:''}</div></div>${c.itens?`<div class="consig-body"><strong>Itens:</strong> ${c.itens}</div>`:''}${c.notas?`<div class="consig-body" style="margin-top:6px"><strong>Notas:</strong> ${c.notas}</div>`:''}<div class="consig-actions"><button class="btn-ghost" onclick="editConsig(${c.id})"><i class="ti ti-edit"></i> Editar</button>${c.status==='avaliando'?`<button class="btn-primary btn-sm" onclick="setConsigStatus(${c.id},'aceito')"><i class="ti ti-check"></i> Aceitar</button><button class="btn-ghost" onclick="setConsigStatus(${c.id},'recusado')" style="color:#A32D2D;border-color:#F09595"><i class="ti ti-x"></i> Recusar</button>`:''}<button class="btn-danger" onclick="deleteConsig(${c.id})"><i class="ti ti-trash"></i></button></div></div>`).join('');updateBadges();}
+async function setConsigStatus(id,status){setSyncing(true);try{await dbUpdate('consig',id,{status});const c=consigs.find(x=>x.id===id);if(c)c.status=status;toast(status==='aceito'?'Proposta aceita!':'Proposta recusada.');renderConsig();}finally{setSyncing(false);}}
+function editConsig(id){const c=consigs.find(x=>x.id===id);if(!c)return;document.getElementById('con-edit-id').value=id;document.getElementById('con-nome').value=c.nome||'';document.getElementById('con-contato').value=c.contato||'';document.getElementById('con-itens').value=c.itens||'';document.getElementById('con-valor').value=c.valor||'';document.getElementById('con-status').value=c.status||'avaliando';document.getElementById('con-notas').value=c.notas||'';document.getElementById('con-data').value=c.data_proposta||todayStr();document.getElementById('modal-consig-title').textContent='Editar proposta';openModal('modal-consig');}
+async function saveConsig(){const nome=document.getElementById('con-nome').value.trim();if(!nome)return alert('Informe o nome do vendedor.');const editId=parseInt(document.getElementById('con-edit-id').value)||0;const obj={nome,contato:document.getElementById('con-contato').value.trim(),itens:document.getElementById('con-itens').value.trim(),valor:parseFloat(document.getElementById('con-valor').value)||0,status:document.getElementById('con-status').value,notas:document.getElementById('con-notas').value.trim(),data_proposta:document.getElementById('con-data').value||todayStr()};setSyncing(true);try{if(editId){await dbUpdate('consig',editId,obj);const idx=consigs.findIndex(x=>x.id===editId);if(idx>=0)consigs[idx]={...consigs[idx],...obj};toast('Proposta atualizada!');}else{const res=await dbInsert('consig',obj);consigs.push(res[0]);toast('Proposta registrada!');}closeModal('modal-consig');clearConsigForm();buildMesOptions('filter-mes-consig','data_proposta',consigs);renderConsig();}catch(e){toast('Erro: '+e.message,'error');}finally{setSyncing(false);}}
+async function deleteConsig(id){if(!confirm('Remover esta proposta?'))return;setSyncing(true);try{await dbDelete('consig',id);consigs=consigs.filter(x=>x.id!==id);toast('Proposta removida.','error');renderConsig();}finally{setSyncing(false);}}
+function clearConsigForm(){document.getElementById('con-edit-id').value='';document.getElementById('modal-consig-title').textContent='Nova proposta';['con-nome','con-contato','con-itens','con-valor','con-notas'].forEach(id=>document.getElementById(id).value='');document.getElementById('con-data').value=todayStr();}
+
+document.querySelectorAll('.modal-bg').forEach(bg=>bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('open');}));
+document.getElementById('prod-data').value=todayStr();
+document.getElementById('ped-data').value=todayStr();
+document.getElementById('con-data').value=todayStr();
+
+SB.auth.onAuthStateChange(async(event,session)=>{
+  if(event==='SIGNED_IN'&&session){
+    document.getElementById('login-screen').classList.add('hidden');
+    await mostrarUsuario(session.user);
+    document.getElementById('loading-text').textContent='Carregando dados...';
+    const o=document.getElementById('loading-overlay');o.classList.remove('hidden');o.style.display='flex';
+    try{await Promise.all([loadEstoque(),loadPedidos(),loadConsig()]);initPainelFiltros();}
+    catch(e){console.error(e);}
+    finally{o.classList.add('hidden');setTimeout(()=>o.style.display='none',400);}
+  }
+  if(event==='SIGNED_OUT'){document.getElementById('login-screen').classList.remove('hidden');}
+});
+
+async function init(){
+  const{data:{session}}=await SB.auth.getSession();
+  if(!session){const o=document.getElementById('loading-overlay');o.classList.add('hidden');setTimeout(()=>o.style.display='none',400);return;}
+  document.getElementById('login-screen').classList.add('hidden');
+  await mostrarUsuario(session.user);
+  document.getElementById('loading-text').textContent='Carregando dados...';
+  try{await Promise.all([loadEstoque(),loadPedidos(),loadConsig()]);initPainelFiltros();}
+  catch(e){console.error(e);}
+  finally{const o=document.getElementById('loading-overlay');o.classList.add('hidden');setTimeout(()=>o.style.display='none',400);}
+}
+init();
+</script>
+</body>
+</html>
