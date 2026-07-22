@@ -930,15 +930,28 @@ let itemRowCount=0;
 function addItemRow(prodId='',qtd=1,preco='',nomeOriginal=''){
   itemRowCount++;const id=itemRowCount;
   const div=document.createElement('div');div.id=`item-row-${id}`;div.className='item-row';
-  const existe=prodId&&produtos.some(p=>p.id==prodId);
-  const staleOpt=(prodId&&!existe)?`<option value="${prodId}" data-preco="${preco}" data-nome="${String(nomeOriginal||'Produto').replace(/"/g,'&quot;')}" data-stale="1" selected>⚠ ${nomeOriginal||'Produto'} (não encontrado no estoque atual)</option>`:'';
+  const prodIdOriginal=prodId;
+  let matched=prodId?produtos.find(p=>p.id==prodId):null;
+  let religadoPorNome=false;
+  if(!matched&&nomeOriginal){
+    // ID não existe mais (ex: estoque foi limpo/reimportado) — tenta achar pelo nome
+    const alvo=String(nomeOriginal).trim().toLowerCase();
+    matched=produtos.find(p=>String(p.nome||'').trim().toLowerCase()===alvo);
+    if(matched){prodId=String(matched.id);religadoPorNome=true;}
+  }
+  const existe=!!matched;
+  const staleOpt=(prodIdOriginal&&!existe)?`<option value="${prodIdOriginal}" data-preco="${preco}" data-nome="${String(nomeOriginal||'Produto').replace(/"/g,'&quot;')}" data-stale="1" selected>⚠ ${nomeOriginal||'Produto'} (não encontrado no estoque atual)</option>`:'';
   const opts=produtos.map(p=>`<option value="${p.id}" data-preco="${p.preco}" data-nome="${String(p.nome).replace(/"/g,'&quot;')}" data-estoque="${p.qtd}" ${p.id==prodId?'selected':''}>${p.nome} (${p.qtd} em estoque)</option>`).join('');
   div.innerHTML=`<div><select onchange="onItemProdChange(${id})" id="item-prod-${id}"><option value="">— selecionar produto —</option>${staleOpt}${opts}</select><div class="item-estoque-info" id="item-info-${id}"></div></div><input type="number" id="item-qtd-${id}" min="1" value="${qtd}" oninput="calcTotal()"><input type="number" id="item-preco-${id}" step="0.01" value="${preco}" oninput="calcTotal()"><button type="button" class="btn-danger" onclick="removeItemRow(${id})"><i class="ti ti-x"></i></button>`;
   document.getElementById('itens-lista').appendChild(div);
   if(staleOpt){
-    document.getElementById(`item-info-${id}`).innerHTML=`<span class="estoque-zero">⚠ Produto não encontrado no estoque atual — nome e preço foram preservados. Selecione o produto correspondente para vincular ao estoque, ou deixe assim para manter como item avulso.</span>`;
+    document.getElementById(`item-info-${id}`).innerHTML=`<span class="estoque-zero">⚠ Produto não encontrado no estoque atual (nem por ID, nem por nome) — nome e preço foram preservados. Selecione o produto correspondente para vincular ao estoque, ou deixe assim para manter como item avulso.</span>`;
   }else if(prodId){
     onItemProdChange(id);
+    if(religadoPorNome){
+      const info=document.getElementById(`item-info-${id}`);
+      info.innerHTML=`<span class="estoque-ok">🔗 Religado automaticamente pelo nome (ID antigo não existia mais)</span><br>${info.innerHTML}`;
+    }
   }
   calcTotal();
 }
