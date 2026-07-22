@@ -293,6 +293,7 @@ tr:hover td{background:var(--bg)}
       <button class="btn-ghost btn-sm" onclick="refreshPedidos()" id="btn-refresh-pedidos"><i class="ti ti-refresh"></i> Atualizar</button>
       <button class="btn-ghost btn-sm dona-only" onclick="openModal('modal-importar-pedidos')"><i class="ti ti-file-import"></i> Importar planilha</button>
       <button class="btn-ghost btn-sm dona-only" onclick="baixarModeloPedidos()"><i class="ti ti-download"></i> Baixar modelo</button>
+      <button class="btn-ghost btn-sm dona-only" onclick="openModal('modal-historico-woo')"><i class="ti ti-brand-wordpress"></i> Histórico WooCommerce</button>
       <button class="btn-primary btn-sm" onclick="abrirNovoPedido()"><i class="ti ti-plus"></i> Registrar pedido</button>
     </div>
   </div>
@@ -405,6 +406,23 @@ tr:hover td{background:var(--bg)}
       <div id="itens-lista"></div>
       <button type="button" class="btn-ghost" style="width:100%;justify-content:center;margin-top:4px" onclick="addItemRow()"><i class="ti ti-plus"></i> Adicionar item</button>
       <div class="itens-resumo"><span style="color:var(--text2);font-size:12px">Total calculado</span><strong id="itens-total">R$ 0,00</strong></div>
+    </div>
+    <div class="form-cols">
+      <div class="form-row"><label>Tipo de entrega</label>
+        <select id="ped-entrega" onchange="checkLojaVisivel()">
+          <option value="">— selecionar —</option>
+          <option value="retirada-loja-pag-retirada">Retirada na loja — pagamento na retirada</option>
+          <option value="retirada-loja-pag-online">Retirada na loja — pagamento online</option>
+          <option value="envio-online">Pagamento online + envio</option>
+        </select>
+      </div>
+      <div class="form-row" id="row-loja" style="display:none"><label>Loja</label>
+        <select id="ped-loja">
+          <option value="">— selecionar —</option>
+          <option value="univille">Univille</option>
+          <option value="sede">Sede</option>
+        </select>
+      </div>
     </div>
     <div class="form-row"><label>Observações / item avulso</label><textarea id="ped-obs" placeholder="Produtos sem cadastro, combos, instruções de entrega..."></textarea></div>
     <div class="form-cols">
@@ -519,6 +537,43 @@ tr:hover td{background:var(--bg)}
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeModal('modal-importar-pedidos');limparImportPedidos()">Cancelar</button>
       <button class="btn-primary" id="btn-importar-pedidos" onclick="confirmarImportPedidos()" disabled><i class="ti ti-check"></i> Importar pedidos</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL HISTÓRICO WOOCOMMERCE -->
+<div class="modal-bg" id="modal-historico-woo">
+  <div class="modal" style="width:600px">
+    <h3>Importar histórico do WooCommerce</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:6px">Busca os pedidos com status <strong>Processando</strong> diretamente do WooCommerce e importa para o sistema.</p>
+    <div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:var(--radius);padding:8px 12px;font-size:12px;color:#E65100;margin-bottom:1rem;display:flex;align-items:flex-start;gap:6px">
+      <i class="ti ti-alert-triangle" style="margin-top:1px;flex-shrink:0"></i>
+      <span>Pedidos já existentes no sistema (mesmo ID do WooCommerce) não serão duplicados. O estoque <strong>não será baixado</strong> automaticamente — confirme manualmente cada pedido.</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+      <select id="woo-status-filtro" style="padding:7px 11px;border:1px solid var(--border-med);border-radius:var(--radius);font-size:13px;background:var(--surface);color:var(--text);font-family:'Nunito Sans',sans-serif">
+        <option value="processing">Processando</option>
+        <option value="pending">Pagamento pendente</option>
+        <option value="on-hold">Aguardando</option>
+        <option value="completed">Concluído</option>
+      </select>
+      <input type="number" id="woo-paginas" min="1" max="20" value="1" style="padding:7px 11px;border:1px solid var(--border-med);border-radius:var(--radius);font-size:13px;background:var(--surface);color:var(--text);width:80px" title="Quantas páginas buscar (100 pedidos por página)">
+      <label style="font-size:12px;color:var(--text2);align-self:center">páginas (100/pág.)</label>
+      <button class="btn-primary btn-sm" id="btn-buscar-woo" onclick="buscarPedidosWoo()"><i class="ti ti-search"></i> Buscar pedidos</button>
+    </div>
+    <div id="woo-loading" style="display:none;text-align:center;padding:1rem;color:var(--text3);font-size:13px">
+      <div class="loading-spinner" style="width:24px;height:24px;border-width:2px;margin:0 auto 8px"></div>
+      Buscando pedidos no WooCommerce...
+    </div>
+    <div id="woo-preview" style="display:none">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em">Preview — pedidos encontrados</div>
+      <div class="import-preview" id="woo-preview-list" style="max-height:200px"></div>
+      <div style="margin-top:8px;font-size:13px;color:var(--text2)">Total: <strong id="woo-total">0</strong> pedidos · <strong id="woo-novos">0</strong> novos para importar</div>
+    </div>
+    <div id="woo-erro" style="display:none;background:#FCEBEB;border:1px solid #F09595;border-radius:var(--radius);padding:8px 12px;font-size:13px;color:#791F1F;margin-top:10px"></div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-historico-woo');limparWoo()">Fechar</button>
+      <button class="btn-primary" id="btn-importar-woo" onclick="confirmarImportWoo()" disabled><i class="ti ti-check"></i> Importar selecionados</button>
     </div>
   </div>
 </div>
@@ -884,6 +939,131 @@ function baixarModeloPedidos(){
   XLSX.writeFile(wb,'modelo-importacao-pedidos-amora.xlsx');
 }
 
+function checkLojaVisivel(){
+  const tipo=document.getElementById('ped-entrega').value;
+  const rowLoja=document.getElementById('row-loja');
+  if(tipo==='retirada-loja-pag-retirada'||tipo==='retirada-loja-pag-online'){
+    rowLoja.style.display='block';
+  } else {
+    rowLoja.style.display='none';
+    document.getElementById('ped-loja').value='';
+  }
+}
+
+const ENTREGA_LABELS={
+  'retirada-loja-pag-retirada':'Retirada • Pag. na retirada',
+  'retirada-loja-pag-online':'Retirada • Pag. online',
+  'envio-online':'Envio • Pag. online'
+};
+const LOJA_LABELS={'univille':'Univille','sede':'Sede'};
+
+function entregaBadge(tipo,loja){
+  if(!tipo)return'<span style="color:var(--text3);font-size:11px">—</span>';
+  const label=ENTREGA_LABELS[tipo]||tipo;
+  const lojaLabel=loja?` (${LOJA_LABELS[loja]||loja})`:'';
+  const color=tipo==='envio-online'?'badge-enviado':tipo==='retirada-loja-pag-online'?'badge-confirmado':'badge-pendente';
+  return`<span class="badge ${color}" style="font-size:10px;white-space:normal;line-height:1.3">${label}${lojaLabel}</span>`;
+}
+
+// ============ HISTÓRICO WOOCOMMERCE ============
+const WOO_URL='https://amorabookstore.com.br';
+const WOO_CK='ck_79677d32013bfa3192f917c7cb03f001850b289c';
+const WOO_CS='cs_82acd12ce8425fb13a5c21301be6821a737601bd';
+let wooDataImportar=[];
+
+async function buscarPedidosWoo(){
+  const status=document.getElementById('woo-status-filtro').value;
+  const paginas=parseInt(document.getElementById('woo-paginas').value)||1;
+  const btn=document.getElementById('btn-buscar-woo');
+  btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Buscando...';
+  document.getElementById('woo-loading').style.display='block';
+  document.getElementById('woo-preview').style.display='none';
+  document.getElementById('woo-erro').style.display='none';
+  wooDataImportar=[];
+
+  try{
+    let todosPedidos=[];
+    for(let pg=1;pg<=paginas;pg++){
+      const url=`${WOO_URL}/wp-json/wc/v3/orders?status=${status}&per_page=100&page=${pg}&consumer_key=${WOO_CK}&consumer_secret=${WOO_CS}`;
+      const r=await fetch(url);
+      if(!r.ok)throw new Error('Erro ao buscar pedidos: '+r.status+' '+r.statusText);
+      const data=await r.json();
+      if(!data.length)break;
+      todosPedidos.push(...data);
+    }
+
+    if(!todosPedidos.length){document.getElementById('woo-erro').textContent='Nenhum pedido encontrado com esse status.';document.getElementById('woo-erro').style.display='block';return;}
+
+    // IDs já existentes no sistema
+    const idsExistentes=new Set(pedidos.map(p=>p.woo_order_id).filter(Boolean));
+
+    const mapaStatus={processing:'confirmado','pending':'pendente','on-hold':'pendente',completed:'enviado',cancelled:'cancelado'};
+    const canaisEntrega={Correios:'envio-online','Retirar na Loja':'retirada-loja-pag-online'};
+
+    wooDataImportar=todosPedidos.map(p=>{
+      const billing=p.billing||{};
+      const cliente=`${billing.first_name||''} ${billing.last_name||''}`.trim()||'Cliente site';
+      const itens=(p.line_items||[]).map(it=>`${it.name} (${it.quantity}x)`).join(', ');
+      const valor=parseFloat(p.total||'0');
+      const dataPedido=p.date_created?p.date_created.substring(0,10):todayStr();
+      const obs=[billing.address_1,billing.city,billing.state,billing.postcode,billing.phone?'Tel: '+billing.phone:'',p.customer_note?'Obs: '+p.customer_note:''].filter(Boolean).join(', ');
+      const wooId=String(p.id);
+      const jaExiste=idsExistentes.has(wooId);
+
+      // Detecta tipo de entrega pelo método de envio
+      const metodoEnvio=(p.shipping_lines||[])[0]?.method_title||'';
+      let tipoEntrega='envio-online';
+      if(metodoEnvio.toLowerCase().includes('retirar')||metodoEnvio.toLowerCase().includes('loja'))tipoEntrega='retirada-loja-pag-online';
+
+      return{woo_order_id:wooId,cliente,canal:'site',produto:itens,valor,status:mapaStatus[p.status]||'pendente',obs,data_pedido:dataPedido,tipo_entrega:tipoEntrega,loja:null,jaExiste};
+    });
+
+    const novos=wooDataImportar.filter(p=>!p.jaExiste).length;
+    document.getElementById('woo-total').textContent=wooDataImportar.length;
+    document.getElementById('woo-novos').textContent=novos;
+
+    const preview=wooDataImportar.slice(0,8).map(p=>`
+      <div class="import-row" style="${p.jaExiste?'opacity:0.4':''}">
+        <span>#${p.woo_order_id} ${p.cliente} ${p.jaExiste?'<span style=\"color:var(--text3);font-size:10px\">(já importado)</span>':''}</span>
+        <span style="font-size:11px">${p.produto.substring(0,40)}${p.produto.length>40?'...':''} · ${fmtMoney(p.valor)}</span>
+      </div>`).join('');
+    document.getElementById('woo-preview-list').innerHTML=preview;
+    document.getElementById('woo-preview').style.display='block';
+    document.getElementById('btn-importar-woo').disabled=novos===0;
+
+  }catch(e){
+    document.getElementById('woo-erro').textContent='Erro: '+e.message+'. Verifique se o site está acessível.';
+    document.getElementById('woo-erro').style.display='block';
+  }finally{
+    document.getElementById('woo-loading').style.display='none';
+    btn.disabled=false;btn.innerHTML='<i class="ti ti-search"></i> Buscar pedidos';
+  }
+}
+
+async function confirmarImportWoo(){
+  const novos=wooDataImportar.filter(p=>!p.jaExiste);
+  if(!novos.length)return;
+  const btn=document.getElementById('btn-importar-woo');
+  btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Importando...';
+  setSyncing(true);
+  try{
+    const paraInserir=novos.map(({jaExiste,...p})=>p);
+    const res=await dbInsert('pedidos',paraInserir);
+    if(Array.isArray(res))pedidos.push(...res);
+    toast(`${novos.length} pedidos importados do WooCommerce!`);
+    closeModal('modal-historico-woo');limparWoo();
+    buildMesOptions('filter-mes-pedidos','data_pedido',pedidos);renderPedidos();
+  }catch(e){toast('Erro ao importar: '+e.message,'error');}
+  finally{setSyncing(false);btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> Importar selecionados';}
+}
+
+function limparWoo(){
+  wooDataImportar=[];
+  document.getElementById('woo-preview').style.display='none';
+  document.getElementById('woo-erro').style.display='none';
+  document.getElementById('btn-importar-woo').disabled=true;
+}
+
 function goPage(p){
   // bloqueia acesso a páginas restritas para funcionária
   if(perfilAtual!=='dona'&&(p==='painel'||p==='consig')){toast('Acesso restrito.','error');return;}
@@ -1019,10 +1199,10 @@ function renderPedidos(){const search=(document.getElementById('search-pedidos')
   const isDona=perfilAtual==='dona';
   document.getElementById('stats-pedidos').innerHTML=`<div class="stat-card"><div class="slabel">Total de pedidos</div><div class="svalue">${total}</div></div><div class="stat-card"><div class="slabel">Pendentes</div><div class="svalue" style="color:#BA7517">${pend}</div><div class="ssub">aguardando ação</div></div>${isDona?`<div class="stat-card"><div class="slabel">Faturamento</div><div class="svalue" style="font-size:18px">${fmtMoney(fat)}</div></div>`:''}<div class="stat-card"><div class="slabel">Via WhatsApp</div><div class="svalue">${wpp}</div></div>`;
   const tbody=document.getElementById('tbody-pedidos');if(!peds.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><i class="ti ti-shopping-cart"></i><p>Nenhum pedido encontrado</p></div></td></tr>`;return;}
-  tbody.innerHTML=peds.map(p=>{const itens=pedidoItens[p.id]||[];const itensStr=itens.length?itens.map(it=>`${it.nome_produto}(${it.quantidade}x)`).join(', '):(p.produto||'—');return`<tr><td style="color:var(--text3);font-size:11px;font-weight:700">#${p.id}</td><td title="${p.cliente||''}">${p.cliente||''}</td><td title="${itensStr}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${itensStr}</td><td><span class="badge badge-canal">${CANAIS[p.canal]||p.canal||'—'}</span></td><td class="col-valor-pedido" ${!isDona?'style="display:none"':''}>${fmtMoney(p.valor)}</td><td>${statusPedBadge(p.status)}</td><td style="color:var(--text3);font-size:12px">${fmtDate(p.data_pedido)}</td><td><div style="display:flex;gap:4px;align-items:center"><button class="btn-ghost" onclick="editPedido(${p.id})"><i class="ti ti-edit"></i></button><button class="btn-ghost" onclick="avancaStatus(${p.id})"><i class="ti ti-arrow-right"></i></button><button class="btn-danger" onclick="deletePedido(${p.id})"><i class="ti ti-trash"></i></button></div></td></tr>`;}).join('');updateBadges();}
-function abrirNovoPedido(){document.getElementById('ped-edit-id').value='';document.getElementById('ped-status-anterior').value='';document.getElementById('ped-cliente').value='';document.getElementById('ped-canal').value='whatsapp';document.getElementById('ped-obs').value='';document.getElementById('ped-status').value='pendente';document.getElementById('ped-data').value=todayStr();document.getElementById('itens-lista').innerHTML='';document.getElementById('alerta-estoque').classList.remove('show');itemRowCount=0;addItemRow();document.getElementById('modal-pedido-title').textContent='Registrar pedido';openModal('modal-pedido');}
-function editPedido(id){const p=pedidos.find(x=>x.id===id);if(!p)return;document.getElementById('ped-edit-id').value=id;document.getElementById('ped-status-anterior').value=p.status;document.getElementById('ped-cliente').value=p.cliente||'';document.getElementById('ped-canal').value=p.canal||'whatsapp';document.getElementById('ped-obs').value=p.obs||'';document.getElementById('ped-status').value=p.status||'pendente';document.getElementById('ped-data').value=p.data_pedido||todayStr();document.getElementById('itens-lista').innerHTML='';document.getElementById('alerta-estoque').classList.remove('show');itemRowCount=0;const itens=pedidoItens[id]||[];if(itens.length)itens.forEach(it=>addItemRow(it.produto_id,it.quantidade,it.preco_unitario,it.nome_produto));else addItemRow();document.getElementById('modal-pedido-title').textContent='Editar pedido';openModal('modal-pedido');}
-async function savePedido(){const cliente=document.getElementById('ped-cliente').value.trim();if(!cliente)return alert('Informe o nome do cliente.');const editId=parseInt(document.getElementById('ped-edit-id').value)||0;const novoStatus=document.getElementById('ped-status').value;const statusAnt=document.getElementById('ped-status-anterior').value;const itens=getItensForm();if(novoStatus==='confirmado'&&statusAnt!=='confirmado'){const prob=verificarEstoque(itens);if(prob.length){document.getElementById('alerta-estoque').classList.add('show');document.getElementById('alerta-estoque-msg').textContent='Estoque insuficiente: '+prob.join(' | ');toast('Estoque insuficiente!','error');return;}}const total=itens.reduce((a,it)=>a+it.quantidade*it.preco_unitario,0);const obj={cliente,canal:document.getElementById('ped-canal').value,produto:itens.map(it=>`${it.nome_produto}(${it.quantidade}x)`).join(', '),valor:parseFloat(total.toFixed(2)),status:novoStatus,obs:document.getElementById('ped-obs').value.trim(),data_pedido:document.getElementById('ped-data').value||todayStr()};const btn=document.getElementById('btn-salvar-pedido');btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Salvando...';setSyncing(true);try{let pedidoId=editId;if(editId){await dbUpdate('pedidos',editId,obj);const idx=pedidos.findIndex(x=>x.id===editId);if(idx>=0)pedidos[idx]={...pedidos[idx],...obj};}else{const res=await dbInsert('pedidos',obj);pedidoId=res[0].id;pedidos.push(res[0]);}if(editId)await fetch(`${SUPA_URL}/rest/v1/pedido_itens?pedido_id=eq.${editId}`,{method:'DELETE',headers:H});if(itens.length){await dbInsert('pedido_itens',itens.map(it=>({...it,pedido_id:pedidoId})));pedidoItens[pedidoId]=itens.map(it=>({...it,pedido_id:pedidoId}));}if(novoStatus==='confirmado'&&statusAnt!=='confirmado'){for(const it of itens){if(!it.produto_id)continue;const p=produtos.find(x=>x.id===it.produto_id);if(p){const nq=Math.max(0,p.qtd-it.quantidade);await dbUpdate('produtos',it.produto_id,{qtd:nq});p.qtd=nq;}}toast('Pedido confirmado! Estoque atualizado.');}else if(novoStatus==='cancelado'&&(statusAnt==='confirmado'||statusAnt==='enviado')){const itAnt=pedidoItens[pedidoId]||[];for(const it of itAnt){if(!it.produto_id)continue;const p=produtos.find(x=>x.id===it.produto_id);if(p){const nq=p.qtd+it.quantidade;await dbUpdate('produtos',it.produto_id,{qtd:nq});p.qtd=nq;}}toast('Pedido cancelado. Estoque devolvido.','warn');}else toast(editId?'Pedido atualizado!':'Pedido registrado!');closeModal('modal-pedido');buildMesOptions('filter-mes-pedidos','data_pedido',pedidos);renderPedidos();renderEstoque();}catch(e){toast('Erro: '+e.message,'error');}finally{setSyncing(false);btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> Salvar pedido';}}
+  tbody.innerHTML=peds.map(p=>{const itens=pedidoItens[p.id]||[];const itensStr=itens.length?itens.map(it=>`${it.nome_produto}(${it.quantidade}x)`).join(', '):(p.produto||'—');return`<tr><td style="color:var(--text3);font-size:11px;font-weight:700">#${p.id}</td><td title="${p.cliente||''}">${p.cliente||''}</td><td title="${itensStr}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${itensStr}</td><td><span class="badge badge-canal">${CANAIS[p.canal]||p.canal||'—'}</span></td><td class="col-valor-pedido" ${!isDona?'style="display:none"':''}>${fmtMoney(p.valor)}</td><td>${statusPedBadge(p.status)}</td><td style="color:var(--text3);font-size:12px">${entregaBadge(p.tipo_entrega,p.loja)}</td><td style="color:var(--text3);font-size:12px">${fmtDate(p.data_pedido)}</td><td><div style="display:flex;gap:4px;align-items:center"><button class="btn-ghost" onclick="editPedido(${p.id})"><i class="ti ti-edit"></i></button><button class="btn-ghost" onclick="avancaStatus(${p.id})"><i class="ti ti-arrow-right"></i></button><button class="btn-danger" onclick="deletePedido(${p.id})"><i class="ti ti-trash"></i></button></div></td></tr>`;}).join('');updateBadges();}
+function abrirNovoPedido(){document.getElementById('ped-edit-id').value='';document.getElementById('ped-status-anterior').value='';document.getElementById('ped-cliente').value='';document.getElementById('ped-canal').value='whatsapp';document.getElementById('ped-obs').value='';document.getElementById('ped-status').value='pendente';document.getElementById('ped-data').value=todayStr();document.getElementById('ped-entrega').value='';document.getElementById('ped-loja').value='';document.getElementById('row-loja').style.display='none';document.getElementById('itens-lista').innerHTML='';document.getElementById('alerta-estoque').classList.remove('show');itemRowCount=0;addItemRow();document.getElementById('modal-pedido-title').textContent='Registrar pedido';openModal('modal-pedido');}
+function editPedido(id){const p=pedidos.find(x=>x.id===id);if(!p)return;document.getElementById('ped-edit-id').value=id;document.getElementById('ped-status-anterior').value=p.status;document.getElementById('ped-cliente').value=p.cliente||'';document.getElementById('ped-canal').value=p.canal||'whatsapp';document.getElementById('ped-obs').value=p.obs||'';document.getElementById('ped-status').value=p.status||'pendente';document.getElementById('ped-data').value=p.data_pedido||todayStr();document.getElementById('ped-entrega').value=p.tipo_entrega||'';document.getElementById('ped-loja').value=p.loja||'';document.getElementById('row-loja').style.display=(p.tipo_entrega&&p.tipo_entrega!=='envio-online')?'block':'none';document.getElementById('itens-lista').innerHTML='';document.getElementById('alerta-estoque').classList.remove('show');itemRowCount=0;const itens=pedidoItens[id]||[];if(itens.length)itens.forEach(it=>addItemRow(it.produto_id,it.quantidade,it.preco_unitario,it.nome_produto));else addItemRow();document.getElementById('modal-pedido-title').textContent='Editar pedido';openModal('modal-pedido');}
+async function savePedido(){const cliente=document.getElementById('ped-cliente').value.trim();if(!cliente)return alert('Informe o nome do cliente.');const editId=parseInt(document.getElementById('ped-edit-id').value)||0;const novoStatus=document.getElementById('ped-status').value;const statusAnt=document.getElementById('ped-status-anterior').value;const itens=getItensForm();if(novoStatus==='confirmado'&&statusAnt!=='confirmado'){const prob=verificarEstoque(itens);if(prob.length){document.getElementById('alerta-estoque').classList.add('show');document.getElementById('alerta-estoque-msg').textContent='Estoque insuficiente: '+prob.join(' | ');toast('Estoque insuficiente!','error');return;}}const total=itens.reduce((a,it)=>a+it.quantidade*it.preco_unitario,0);const obj={cliente,canal:document.getElementById('ped-canal').value,produto:itens.map(it=>`${it.nome_produto}(${it.quantidade}x)`).join(', '),valor:parseFloat(total.toFixed(2)),status:novoStatus,obs:document.getElementById('ped-obs').value.trim(),data_pedido:document.getElementById('ped-data').value||todayStr(),tipo_entrega:document.getElementById('ped-entrega').value||null,loja:document.getElementById('ped-loja').value||null};const btn=document.getElementById('btn-salvar-pedido');btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Salvando...';setSyncing(true);try{let pedidoId=editId;if(editId){await dbUpdate('pedidos',editId,obj);const idx=pedidos.findIndex(x=>x.id===editId);if(idx>=0)pedidos[idx]={...pedidos[idx],...obj};}else{const res=await dbInsert('pedidos',obj);pedidoId=res[0].id;pedidos.push(res[0]);}if(editId)await fetch(`${SUPA_URL}/rest/v1/pedido_itens?pedido_id=eq.${editId}`,{method:'DELETE',headers:H});if(itens.length){await dbInsert('pedido_itens',itens.map(it=>({...it,pedido_id:pedidoId})));pedidoItens[pedidoId]=itens.map(it=>({...it,pedido_id:pedidoId}));}if(novoStatus==='confirmado'&&statusAnt!=='confirmado'){for(const it of itens){if(!it.produto_id)continue;const p=produtos.find(x=>x.id===it.produto_id);if(p){const nq=Math.max(0,p.qtd-it.quantidade);await dbUpdate('produtos',it.produto_id,{qtd:nq});p.qtd=nq;}}toast('Pedido confirmado! Estoque atualizado.');}else if(novoStatus==='cancelado'&&(statusAnt==='confirmado'||statusAnt==='enviado')){const itAnt=pedidoItens[pedidoId]||[];for(const it of itAnt){if(!it.produto_id)continue;const p=produtos.find(x=>x.id===it.produto_id);if(p){const nq=p.qtd+it.quantidade;await dbUpdate('produtos',it.produto_id,{qtd:nq});p.qtd=nq;}}toast('Pedido cancelado. Estoque devolvido.','warn');}else toast(editId?'Pedido atualizado!':'Pedido registrado!');closeModal('modal-pedido');buildMesOptions('filter-mes-pedidos','data_pedido',pedidos);renderPedidos();renderEstoque();}catch(e){toast('Erro: '+e.message,'error');}finally{setSyncing(false);btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> Salvar pedido';}}
 async function avancaStatus(id){const flow=['pendente','confirmado','enviado'];const p=pedidos.find(x=>x.id===id);if(!p)return;const idx=flow.indexOf(p.status);if(idx<0||idx>=flow.length-1)return;const novo=flow[idx+1];if(novo==='confirmado'){const prob=verificarEstoque(pedidoItens[id]||[]);if(prob.length){toast('Estoque insuficiente: '+prob.join(' | '),'error');return;}}setSyncing(true);try{await dbUpdate('pedidos',id,{status:novo});p.status=novo;if(novo==='confirmado'){const itens=pedidoItens[id]||[];for(const it of itens){if(!it.produto_id)continue;const pr=produtos.find(x=>x.id===it.produto_id);if(pr){const nq=Math.max(0,pr.qtd-it.quantidade);await dbUpdate('produtos',it.produto_id,{qtd:nq});pr.qtd=nq;}}toast(`Pedido #${id} confirmado! Estoque atualizado.`);}else toast(`Pedido #${id} → ${STATUS_PED[novo]}`);renderPedidos();renderEstoque();}finally{setSyncing(false);}}
 async function deletePedido(id){if(!confirm('Remover este pedido?'))return;const p=pedidos.find(x=>x.id===id);if(p&&(p.status==='confirmado'||p.status==='enviado')){if(!confirm('Este pedido está confirmado. Devolver itens ao estoque?'))return;const itens=pedidoItens[id]||[];setSyncing(true);try{for(const it of itens){if(!it.produto_id)continue;const pr=produtos.find(x=>x.id===it.produto_id);if(pr){const nq=pr.qtd+it.quantidade;await dbUpdate('produtos',it.produto_id,{qtd:nq});pr.qtd=nq;}}}finally{setSyncing(false);}}setSyncing(true);try{await dbDelete('pedidos',id);pedidos=pedidos.filter(x=>x.id!==id);delete pedidoItens[id];toast('Pedido removido.','error');renderPedidos();renderEstoque();}finally{setSyncing(false);}}
 
