@@ -61,12 +61,12 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg);color:var(--text)
 .cat-tab:hover{background:var(--surface2)}
 .cat-tab.active{border-color:var(--amora);background:var(--amora-light);color:var(--amora-dark)}
 .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);margin-bottom:1.5rem}
-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
 th{text-align:left;padding:10px 14px;font-size:11px;font-weight:700;color:var(--text3);border-bottom:1px solid var(--border);background:var(--surface2);text-transform:uppercase;letter-spacing:0.05em}
 th.th-sortable{cursor:pointer;user-select:none;transition:color 0.15s}
 th.th-sortable:hover{color:var(--amora-dark)}
 .sort-ind{font-size:9px;color:var(--amora);margin-left:2px}
-td{padding:8px 14px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:var(--bg)}
 .badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap}
@@ -75,7 +75,7 @@ tr:hover td{background:var(--bg)}
 .badge-outro{background:var(--surface2);color:var(--text2)}.badge-ok{background:#EAF3DE;color:#27500A}.badge-baixo{background:#FAEEDA;color:#633806}
 .badge-zerado{background:#FCEBEB;color:#791F1F}.badge-pendente{background:#FAEEDA;color:#633806}.badge-confirmado{background:#EAF3DE;color:#27500A}
 .badge-enviado{background:#E6F1FB;color:#0C447C}.badge-cancelado{background:#FCEBEB;color:#791F1F}.badge-avaliando{background:#FAEEDA;color:#633806}
-.badge-aceito{background:#EAF3DE;color:#27500A}.badge-recusado{background:#FCEBEB;color:#791F1F}.badge-canal{background:var(--surface2);color:var(--text2)}
+.badge-aceito{background:#EAF3DE;color:#27500A}.badge-recusado{background:#FCEBEB;color:#791F1F}.badge-canal{background:var(--surface2);color:var(--text2)}.badge-entrega-sm{font-size:10px!important;padding:2px 6px!important;white-space:normal!important;line-height:1.3!important;text-align:center}
 .badge-dona{background:#FBEAF0;color:#72243E}.badge-funcionaria{background:#EAF3DE;color:#27500A}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
 .modal-bg.open{display:flex}
@@ -311,18 +311,18 @@ tr:hover td{background:var(--bg)}
       <option value="enviado">Enviado</option><option value="cancelado">Cancelado</option>
     </select>
   </div>
-  <div class="table-wrap" style="overflow-x:auto">
-    <table style="table-layout:auto;min-width:900px">
+  <div class="table-wrap">
+    <table style="table-layout:fixed;width:100%">
       <thead><tr>
-        <th style="min-width:50px;width:4%" class="th-sortable" onclick="sortPedidosBy('id')">#<span class="sort-ind" id="sort-ind-pedidos-id"></span></th>
-        <th style="min-width:140px;width:13%" class="th-sortable" onclick="sortPedidosBy('cliente')">Cliente <span class="sort-ind" id="sort-ind-pedidos-cliente"></span></th>
-        <th style="min-width:200px;width:20%">Produtos</th>
-        <th style="min-width:80px;width:7%" class="th-sortable" onclick="sortPedidosBy('canal')">Canal <span class="sort-ind" id="sort-ind-pedidos-canal"></span></th>
-        <th style="min-width:90px;width:8%" class="th-sortable" onclick="sortPedidosBy('valor')">Valor <span class="sort-ind" id="sort-ind-pedidos-valor"></span></th>
-        <th style="min-width:110px;width:9%" class="th-sortable" onclick="sortPedidosBy('status')">Status <span class="sort-ind" id="sort-ind-pedidos-status"></span></th>
-        <th style="min-width:150px;width:14%">Entrega</th>
-        <th style="min-width:90px;width:8%" class="th-sortable" onclick="sortPedidosBy('data_pedido')">Data <span class="sort-ind" id="sort-ind-pedidos-data_pedido"></span></th>
-        <th style="min-width:120px;width:17%">Ações</th>
+        <th style="width:3%" class="th-sortable" onclick="sortPedidosBy('id')">#<span class="sort-ind" id="sort-ind-pedidos-id"></span></th>
+        <th style="width:12%" class="th-sortable" onclick="sortPedidosBy('cliente')">Cliente <span class="sort-ind" id="sort-ind-pedidos-cliente"></span></th>
+        <th style="width:22%">Produtos</th>
+        <th style="width:6%" class="th-sortable" onclick="sortPedidosBy('canal')">Canal <span class="sort-ind" id="sort-ind-pedidos-canal"></span></th>
+        <th style="width:8%" class="th-sortable" onclick="sortPedidosBy('valor')">Valor <span class="sort-ind" id="sort-ind-pedidos-valor"></span></th>
+        <th style="width:9%" class="th-sortable" onclick="sortPedidosBy('status')">Status <span class="sort-ind" id="sort-ind-pedidos-status"></span></th>
+        <th style="width:16%">Entrega</th>
+        <th style="width:8%" class="th-sortable" onclick="sortPedidosBy('data_pedido')">Data <span class="sort-ind" id="sort-ind-pedidos-data_pedido"></span></th>
+        <th style="width:16%">Ações</th>
       </tr></thead>
       <tbody id="tbody-pedidos"></tbody>
     </table>
@@ -963,7 +963,7 @@ function entregaBadge(tipo,loja){
   const label=ENTREGA_LABELS[tipo]||tipo;
   const lojaLabel=loja?` (${LOJA_LABELS[loja]||loja})`:'';
   const color=tipo==='envio-online'?'badge-enviado':tipo==='retirada-loja-pag-online'?'badge-confirmado':'badge-pendente';
-  return`<span class="badge ${color}" style="font-size:10px;white-space:normal;line-height:1.3">${label}${lojaLabel}</span>`;
+  return`<span class="badge ${color} badge-entrega-sm">${label}${lojaLabel}</span>`;
 }
 
 // ============ HISTÓRICO WOOCOMMERCE ============
