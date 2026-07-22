@@ -1012,11 +1012,22 @@ async function buscarPedidosWoo(){
       const jaExiste=idsExistentes.has(wooId);
 
       // Detecta tipo de entrega pelo método de envio
-      const metodoEnvio=(p.shipping_lines||[])[0]?.method_title||'';
-      let tipoEntrega='envio-online';
-      if(metodoEnvio.toLowerCase().includes('retirar')||metodoEnvio.toLowerCase().includes('loja'))tipoEntrega='retirada-loja-pag-online';
+      const metodoEnvio=((p.shipping_lines||[])[0]?.method_title||'').toLowerCase();
+      const methodId=(p.shipping_lines||[])[0]?.method_id||'';
+      const paymentMethod=p.payment_method||'';
 
-      return{woo_order_id:wooId,cliente,canal:'site',produto:itens,valor,status:mapaStatus[p.status]||'pendente',obs,data_pedido:dataPedido,tipo_entrega:tipoEntrega,loja:null,jaExiste};
+      // Detecta tipo de entrega
+      let tipoEntrega='envio-online';
+      let loja=null;
+      if(methodId==='local_pickup'||metodoEnvio.includes('retirar')||metodoEnvio.includes('retirada')||metodoEnvio.includes('loja')){
+        const pagOnline=paymentMethod&&paymentMethod!=='cod';
+        tipoEntrega=pagOnline?'retirada-loja-pag-online':'retirada-loja-pag-retirada';
+        // Detecta qual loja
+        if(metodoEnvio.includes('univille')||metodoEnvio.includes('biblioteca'))loja='univille';
+        else if(metodoEnvio.includes('almirante')||metodoEnvio.includes('tamandar')||metodoEnvio.includes('loja f'))loja='sede';
+      }
+
+      return{woo_order_id:wooId,cliente,canal:'site',produto:itens,valor,status:mapaStatus[p.status]||'pendente',obs,data_pedido:dataPedido,tipo_entrega:tipoEntrega,loja,jaExiste};
     });
 
     const novos=wooDataImportar.filter(p=>!p.jaExiste).length;
