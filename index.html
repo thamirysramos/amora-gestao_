@@ -457,10 +457,10 @@ tr:hover td{background:var(--bg)}
 <div class="modal-bg" id="modal-importar">
   <div class="modal">
     <h3>Importar planilha de produtos</h3>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:1rem">Suba uma planilha Excel (.xlsx) com os produtos. Use o botão <strong>"Baixar modelo"</strong> para ver o formato correto.</p>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:1rem">Suba uma planilha Excel (.xlsx) ou CSV com os produtos. Aceita o arquivo exportado diretamente do WooCommerce ou o modelo do sistema.</p>
     <div class="import-area" id="import-area" onclick="document.getElementById('import-input').click()">
       <i class="ti ti-file-spreadsheet"></i>
-      <span id="import-label" style="font-size:13px;color:var(--text2)">Clique para selecionar o arquivo Excel (.xlsx)</span>
+      <span id="import-label" style="font-size:13px;color:var(--text2)">Clique para selecionar o arquivo (.xlsx ou .csv)</span>
     </div>
     <input type="file" id="import-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportFile(this)">
     <div id="import-preview" style="display:none">
@@ -487,7 +487,7 @@ tr:hover td{background:var(--bg)}
     </div>
     <div class="import-area" id="import-area-pedidos" onclick="document.getElementById('import-input-pedidos').click()">
       <i class="ti ti-file-spreadsheet"></i>
-      <span id="import-label-pedidos" style="font-size:13px;color:var(--text2)">Clique para selecionar o arquivo Excel (.xlsx)</span>
+      <span id="import-label-pedidos" style="font-size:13px;color:var(--text2)">Clique para selecionar o arquivo (.xlsx ou .csv)</span>
     </div>
     <input type="file" id="import-input-pedidos" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportPedidos(this)">
     <div id="import-preview-pedidos" style="display:none">
@@ -640,22 +640,55 @@ function handleImportFile(input){
       const ws=wb.Sheets[wb.SheetNames[0]];
       const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
       if(!rows.length){showImportErro('Planilha vazia ou formato inválido.');return;}
-      // normaliza colunas
-      importData=rows.map(r=>({
-        nome:String(r.nome||r.Produto||r.PRODUTO||r.Nome||'').trim(),
-        cat:String(r.cat||r.Categoria||r.categoria||'outro').trim().toLowerCase(),
-        qtd:parseInt(r.qtd||r.Quantidade||r.quantidade||0)||0,
-        preco:parseFloat(String(r.preco||r.Preço||r.preco||0).replace(',','.'))||0,
-        canal:String(r.canal||r.Canal||'loja').trim().toLowerCase(),
-        obs:String(r.obs||r.Observacoes||r.observações||'').trim(),
-        data_entrada:todayStr()
-      })).filter(r=>r.nome);
-      if(!importData.length){showImportErro('Nenhum produto válido encontrado. Verifique se a coluna "nome" existe.');return;}
+
+      const canaisValidos=['site','loja','ambos','whatsapp','instagram'];
+
+      importData=rows.map(r=>{
+        // Nome — aceita coluna "Nome" (WooCommerce) ou "nome" (modelo do sistema)
+        const nome=String(r.nome||r.Nome||r.Produto||r.PRODUTO||'').trim();
+        if(!nome)return null;
+
+        // Categoria — aceita "cat" do sistema ou tenta inferir das categorias do WooCommerce
+        let cat=String(r.cat||r.Categoria||r.categoria||'').trim().toLowerCase();
+        if(!cat||cat===''){
+          const cats=String(r.Categorias||r.categorias||'').toLowerCase();
+          if(cats.includes('manga')||cats.includes('editora')||cats.includes('jbc')||cats.includes('panini')||cats.includes('volume'))cat='manga';
+          else if(cats.includes('funko'))cat='funko';
+          else if(cats.includes('pokemon'))cat='pokemon';
+          else if(cats.includes('yugioh')||cats.includes('yu-gi-oh'))cat='yugioh';
+          else if(cats.includes('camisa')||cats.includes('camiseta'))cat='camisa';
+          else if(cats.includes('tiny'))cat='tinytoy';
+          else cat='manga'; // padrão para WooCommerce da Amora (só mangás)
+        }
+
+        // Quantidade — aceita "Estoque" (WooCommerce) ou "qtd" (sistema)
+        const qtdRaw=String(r.qtd||r.Estoque||r.Quantidade||r.quantidade||'0').trim();
+        const qtd=parseInt(qtdRaw)||0;
+
+        // Preço — aceita vírgula ou ponto
+        const precoRaw=String(r.preco||r.Preço||r.Precio||'0').trim().replace(',','.');
+        const preco=parseFloat(precoRaw)||0;
+
+        // Canal
+        let canal=String(r.canal||r.Canal||'site').trim().toLowerCase();
+        if(!canaisValidos.includes(canal))canal='site';
+
+        // Observações — aceita Tags do WooCommerce como obs
+        const obs=String(r.obs||r.Obs||r.observações||r.Tags||r.tags||'').trim();
+
+        // Imagem — aceita URL direta (WooCommerce exporta URL completa)
+        const imagem=String(r.imagem||r.Imagem||r.Imagens||r.imagens||'').trim().split('|')[0].trim()||null;
+
+        return {nome,cat,qtd,preco,canal,obs,data_entrada:todayStr(),imagem:imagem||null};
+      }).filter(r=>r&&r.nome);
+
+      if(!importData.length){showImportErro('Nenhum produto válido encontrado. Verifique se o arquivo tem uma coluna "Nome" ou "nome".');return;}
       document.getElementById('import-erro').style.display='none';
       document.getElementById('import-label').textContent=`✓ ${file.name} — ${importData.length} produtos encontrados`;
       document.getElementById('import-total').textContent=importData.length;
-      const preview=importData.slice(0,5).map(r=>`<div class="import-row"><span>${r.nome}</span><span>${CATS[r.cat]||r.cat} · ${r.qtd} un · ${fmtMoney(r.preco)}</span></div>`).join('');
-      document.getElementById('import-preview-list').innerHTML=preview;
+      const comFoto=importData.filter(r=>r.imagem).length;
+      const preview=importData.slice(0,5).map(r=>`<div class="import-row"><span>${r.nome}</span><span>${CATS[r.cat]||r.cat} · ${r.qtd} un · ${fmtMoney(r.preco)}${r.imagem?' 🖼':''}</span></div>`).join('');
+      document.getElementById('import-preview-list').innerHTML=preview+`<div class="import-row" style="margin-top:6px;color:var(--text3)"><span>📸 ${comFoto} produtos com foto vinculada</span></div>`;
       document.getElementById('import-preview').style.display='block';
       document.getElementById('btn-importar').disabled=false;
     }catch(err){showImportErro('Erro ao ler o arquivo: '+err.message);}
@@ -677,7 +710,7 @@ async function confirmarImport(){
   }catch(e){showImportErro('Erro ao importar: '+e.message);}
   finally{setSyncing(false);btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> Importar produtos';}
 }
-function limparImport(){importData=[];document.getElementById('import-input').value='';document.getElementById('import-preview').style.display='none';document.getElementById('import-erro').style.display='none';document.getElementById('import-label').textContent='Clique para selecionar o arquivo Excel (.xlsx)';document.getElementById('btn-importar').disabled=true;}
+function limparImport(){importData=[];document.getElementById('import-input').value='';document.getElementById('import-preview').style.display='none';document.getElementById('import-erro').style.display='none';document.getElementById('import-label').textContent='Clique para selecionar o arquivo (.xlsx ou .csv)';document.getElementById('btn-importar').disabled=true;}
 
 function baixarModelo(){
   const ws=XLSX.utils.aoa_to_sheet([
@@ -744,7 +777,7 @@ async function confirmarImportPedidos(){
   }catch(e){showImportErroPedidos('Erro ao importar: '+e.message);}
   finally{setSyncing(false);btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> Importar pedidos';}
 }
-function limparImportPedidos(){importDataPedidos=[];document.getElementById('import-input-pedidos').value='';document.getElementById('import-preview-pedidos').style.display='none';document.getElementById('import-erro-pedidos').style.display='none';document.getElementById('import-label-pedidos').textContent='Clique para selecionar o arquivo Excel (.xlsx)';document.getElementById('btn-importar-pedidos').disabled=true;}
+function limparImportPedidos(){importDataPedidos=[];document.getElementById('import-input-pedidos').value='';document.getElementById('import-preview-pedidos').style.display='none';document.getElementById('import-erro-pedidos').style.display='none';document.getElementById('import-label-pedidos').textContent='Clique para selecionar o arquivo (.xlsx ou .csv)';document.getElementById('btn-importar-pedidos').disabled=true;}
 function baixarModeloPedidos(){
   const ws=XLSX.utils.aoa_to_sheet([
     ['cliente','canal','produto','valor','status','data_pedido','obs'],
