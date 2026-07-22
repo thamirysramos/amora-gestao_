@@ -640,14 +640,75 @@ async function alterarSenha(){
 
 // ============ IMPORTAR PLANILHA ============
 let importData=[];
+
+// Parser de CSV "na unha" (RFC4180): respeita aspas e vírgulas dentro de campos,
+// mantendo os valores como TEXTO puro — evita que o XLSX.js "adivinhe" tipos
+// numéricos e transforme preços como "29,90" em 2990.
+function parseCSVText(text){
+  const rows=[];let row=[];let field='';let inQuotes=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQuotes){
+      if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else inQuotes=false; }
+      else field+=c;
+    }else{
+      if(c==='"') inQuotes=true;
+      else if(c===','){row.push(field);field='';}
+      else if(c==='\r'){ /* ignora, tratado junto com \n */ }
+      else if(c==='\n'){row.push(field);rows.push(row);row=[];field='';}
+      else field+=c;
+    }
+  }
+  if(field.length||row.length){row.push(field);rows.push(row);}
+  return rows.filter(r=>r.some(v=>String(v).trim()!==''));
+}
+function csvToObjects(text){
+  const rows=parseCSVText(text);
+  if(!rows.length)return[];
+  const headers=rows[0].map(h=>h.trim());
+  return rows.slice(1).map(r=>{
+    const obj={};
+    headers.forEach((h,i)=>{obj[h]=r[i]!==undefined?r[i]:'';});
+    return obj;
+  });
+}
+// Converte preço em texto (BR ou US) para número. Aceita "29,90", "1.234,56" e "29.90".
+function parsePrecoBR(raw){
+  let s=String(raw==null?'':raw).trim();
+  if(!s)return 0;
+  s=s.replace(/[^\d.,-]/g,''); // remove "R$", espaços etc.
+  if(s.includes(',')&&s.includes('.')){
+    s=s.replace(/\./g,'').replace(',','.'); // "1.234,56" -> "1234.56"
+  }else if(s.includes(',')){
+    s=s.replace(',','.'); // "29,90" -> "29.90"
+  }
+  return parseFloat(s)||0;
+}
+
 function handleImportFile(input){
   const file=input.files[0];if(!file)return;
+  const isCSV=/\.csv$/i.test(file.name);
   const reader=new FileReader();
   reader.onload=function(e){
     try{
-      const wb=XLSX.read(e.target.result,{type:'array'});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      let rows;
+      if(isCSV){
+        let text=e.target.result;
+        if(text.charCodeAt(0)===0xFEFF)text=text.slice(1); // remove BOM do UTF-8
+        rows=csvToObjects(text);
+      }else{
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      }
+      processImportRows(rows,file.name);
+    }catch(err){showImportErro('Erro ao ler o arquivo: '+err.message);}
+  };
+  if(isCSV)reader.readAsText(file,'UTF-8');
+  else reader.readAsArrayBuffer(file);
+}
+function processImportRows(rows,filename){
+  try{
       if(!rows.length){showImportErro('Planilha vazia ou formato inválido.');return;}
 
       const canaisValidos=['site','loja','ambos','whatsapp','instagram'];
@@ -674,9 +735,8 @@ function handleImportFile(input){
         const qtdRaw=String(r.qtd||r.Estoque||r.Quantidade||r.quantidade||'0').trim();
         const qtd=parseInt(qtdRaw)||0;
 
-        // Preço — aceita vírgula ou ponto
-        const precoRaw=String(r.preco||r.Preço||r.Precio||'0').trim().replace(',','.');
-        const preco=parseFloat(precoRaw)||0;
+        // Preço — aceita "29,90" (BR), "1.234,56" (BR com milhar) ou "29.90" (US)
+        const preco=parsePrecoBR(r.preco||r.Preço||r.Precio||'0');
 
         // Canal
         let canal=String(r.canal||r.Canal||'site').trim().toLowerCase();
@@ -693,16 +753,14 @@ function handleImportFile(input){
 
       if(!importData.length){showImportErro('Nenhum produto válido encontrado. Verifique se o arquivo tem uma coluna "Nome" ou "nome".');return;}
       document.getElementById('import-erro').style.display='none';
-      document.getElementById('import-label').textContent=`✓ ${file.name} — ${importData.length} produtos encontrados`;
+      document.getElementById('import-label').textContent=`✓ ${filename} — ${importData.length} produtos encontrados`;
       document.getElementById('import-total').textContent=importData.length;
       const comFoto=importData.filter(r=>r.imagem).length;
       const preview=importData.slice(0,5).map(r=>`<div class="import-row"><span>${r.nome}</span><span>${CATS[r.cat]||r.cat} · ${r.qtd} un · ${fmtMoney(r.preco)}${r.imagem?' 🖼':''}</span></div>`).join('');
       document.getElementById('import-preview-list').innerHTML=preview+`<div class="import-row" style="margin-top:6px;color:var(--text3)"><span>📸 ${comFoto} produtos com foto vinculada</span></div>`;
       document.getElementById('import-preview').style.display='block';
       document.getElementById('btn-importar').disabled=false;
-    }catch(err){showImportErro('Erro ao ler o arquivo: '+err.message);}
-  };
-  reader.readAsArrayBuffer(file);
+  }catch(err){showImportErro('Erro ao processar o arquivo: '+err.message);}
 }
 function showImportErro(msg){const el=document.getElementById('import-erro');el.textContent=msg;el.style.display='block';}
 async function confirmarImport(){
