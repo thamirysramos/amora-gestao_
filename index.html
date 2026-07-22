@@ -32,6 +32,8 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg);color:var(--text)
 .sync-dot.loading{background:#FF9800;animation:pulse 1s infinite}
 .sync-dot.error{background:#F44336}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.btn-ghost.spin i,.btn-danger.spin i{display:inline-block;animation:spin 0.7s linear infinite}
 .page{display:none;padding:1.5rem;max-width:1200px;margin:0 auto}
 .page.active{display:block}
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:1.5rem}
@@ -226,6 +228,7 @@ tr:hover td{background:var(--bg)}
     <select id="painel-mes" onchange="renderPainel()"></select>
     <select id="painel-ano" onchange="renderPainel()"></select>
     <button class="btn-ghost" onclick="setPainelHoje()"><i class="ti ti-calendar"></i> Mês atual</button>
+    <button class="btn-ghost" onclick="refreshPainel()" id="btn-refresh-painel"><i class="ti ti-refresh"></i> Atualizar</button>
   </div>
   <div class="painel-grid" id="painel-metricas"></div>
   <div class="painel-row">
@@ -244,8 +247,10 @@ tr:hover td{background:var(--bg)}
   <div class="section-header">
     <span class="section-title">Produtos em estoque</span>
     <div style="display:flex;gap:8px">
+      <button class="btn-ghost btn-sm" onclick="refreshEstoque()" id="btn-refresh-estoque"><i class="ti ti-refresh"></i> Atualizar</button>
       <button class="btn-ghost btn-sm dona-only" onclick="openModal('modal-importar')"><i class="ti ti-file-import"></i> Importar planilha</button>
       <button class="btn-ghost btn-sm dona-only" onclick="baixarModelo()"><i class="ti ti-download"></i> Baixar modelo</button>
+      <button class="btn-danger btn-sm dona-only" onclick="limparEstoque()" id="btn-limpar-estoque"><i class="ti ti-trash"></i> Limpar estoque</button>
       <button class="btn-primary btn-sm" onclick="openModal('modal-produto')"><i class="ti ti-plus"></i> Adicionar produto</button>
     </div>
   </div>
@@ -278,6 +283,7 @@ tr:hover td{background:var(--bg)}
   <div class="section-header">
     <span class="section-title">Pedidos recebidos</span>
     <div style="display:flex;gap:8px">
+      <button class="btn-ghost btn-sm" onclick="refreshPedidos()" id="btn-refresh-pedidos"><i class="ti ti-refresh"></i> Atualizar</button>
       <button class="btn-ghost btn-sm dona-only" onclick="openModal('modal-importar-pedidos')"><i class="ti ti-file-import"></i> Importar planilha</button>
       <button class="btn-ghost btn-sm dona-only" onclick="baixarModeloPedidos()"><i class="ti ti-download"></i> Baixar modelo</button>
       <button class="btn-primary btn-sm" onclick="abrirNovoPedido()"><i class="ti ti-plus"></i> Registrar pedido</button>
@@ -315,7 +321,10 @@ tr:hover td{background:var(--bg)}
   <div class="stats-grid" id="stats-consig"></div>
   <div class="section-header">
     <span class="section-title">Propostas de consignação</span>
-    <button class="btn-primary btn-sm" onclick="openModal('modal-consig')"><i class="ti ti-plus"></i> Nova proposta</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn-ghost btn-sm" onclick="refreshConsig()" id="btn-refresh-consig"><i class="ti ti-refresh"></i> Atualizar</button>
+      <button class="btn-primary btn-sm" onclick="openModal('modal-consig')"><i class="ti ti-plus"></i> Nova proposta</button>
+    </div>
   </div>
   <div class="filters">
     <input type="text" id="search-consig" placeholder="🔍 Buscar por nome ou item..." oninput="renderConsig()">
@@ -798,6 +807,37 @@ function goPage(p){
   document.getElementById('page-'+p).classList.add('active');
   document.getElementById('tab-'+p).classList.add('active');
   if(p==='painel')renderPainel();
+}
+
+// ============ REFRESH POR ABA ============
+async function refreshEstoque(){const btn=document.getElementById('btn-refresh-estoque');if(btn){btn.disabled=true;btn.classList.add('spin');}try{await loadEstoque();toast('Estoque atualizado!');}catch(e){toast('Erro ao atualizar estoque.','error');}finally{if(btn){btn.disabled=false;btn.classList.remove('spin');}}}
+async function refreshPedidos(){const btn=document.getElementById('btn-refresh-pedidos');if(btn){btn.disabled=true;btn.classList.add('spin');}try{await loadPedidos();toast('Pedidos atualizados!');}catch(e){toast('Erro ao atualizar pedidos.','error');}finally{if(btn){btn.disabled=false;btn.classList.remove('spin');}}}
+async function refreshConsig(){const btn=document.getElementById('btn-refresh-consig');if(btn){btn.disabled=true;btn.classList.add('spin');}try{await loadConsig();toast('Consignação atualizada!');}catch(e){toast('Erro ao atualizar consignação.','error');}finally{if(btn){btn.disabled=false;btn.classList.remove('spin');}}}
+async function refreshPainel(){const btn=document.getElementById('btn-refresh-painel');if(btn){btn.disabled=true;btn.classList.add('spin');}try{await Promise.all([loadEstoque(),loadPedidos(),loadConsig()]);renderPainel();toast('Painel atualizado!');}catch(e){toast('Erro ao atualizar painel.','error');}finally{if(btn){btn.disabled=false;btn.classList.remove('spin');}}}
+
+// ============ LIMPAR ESTOQUE ============
+async function limparEstoque(){
+  if(!produtos.length){toast('O estoque já está vazio.','warn');return;}
+  if(!confirm(`Isso vai apagar TODOS os ${produtos.length} produtos do estoque, incluindo fotos cadastradas. Essa ação não pode ser desfeita.\n\nDeseja continuar?`))return;
+  if(!confirm('Tem certeza mesmo? Todos os produtos serão removidos permanentemente do banco de dados.'))return;
+  const btn=document.getElementById('btn-limpar-estoque');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Limpando...';}
+  setSyncing(true);
+  try{
+    for(const p of produtos){if(p.imagem)await deleteFotoStorage(p.imagem);}
+    const r=await fetch(`${SUPA_URL}/rest/v1/produtos?id=not.is.null`,{method:'DELETE',headers:H});
+    if(!r.ok)throw new Error(await r.text());
+    produtos=[];
+    activeCatFilter='todos';
+    buildMesOptions('filter-mes-estoque','data_entrada',produtos);
+    renderEstoque();
+    toast('Estoque limpo com sucesso.','warn');
+  }catch(e){
+    toast('Erro ao limpar estoque: '+e.message,'error');
+  }finally{
+    setSyncing(false);
+    if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-trash"></i> Limpar estoque';}
+  }
 }
 
 // ============ ITENS PEDIDO ============
