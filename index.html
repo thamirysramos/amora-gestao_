@@ -800,18 +800,27 @@ function processImportRows(rows,filename){
         // Nome — aceita coluna "Nome" (WooCommerce) ou "nome" (modelo do sistema)
         const nome=String(r.nome||r.Nome||r.Produto||r.PRODUTO||'').trim();
         if(!nome)return null;
+        const nomeLower=nome.toLowerCase();
 
         // Categoria — aceita "cat" do sistema ou tenta inferir das categorias do WooCommerce
         let cat=String(r.cat||r.Categoria||r.categoria||'').trim().toLowerCase();
         if(!cat||cat===''){
           const cats=String(r.Categorias||r.categorias||'').toLowerCase();
-          if(cats.includes('manga')||cats.includes('editora')||cats.includes('jbc')||cats.includes('panini')||cats.includes('volume'))cat='manga';
+          // Tenta detectar pelo nome do produto também
+          if(nomeLower.includes('pokemon')||nomeLower.includes('pokémon')||nomeLower.includes('booster')||nomeLower.includes('tcg')||nomeLower.includes('carta pok')||nomeLower.includes('pacote de cartas')||nomeLower.includes('elite trainer')||nomeLower.includes('deck pok'))cat='pokemon';
+          else if(nomeLower.includes('funko'))cat='funko';
+          else if(nomeLower.includes('yu-gi-oh')||nomeLower.includes('yugioh'))cat='yugioh';
+          else if(nomeLower.includes('tiny toy'))cat='tinytoy';
+          else if(nomeLower.includes('camisa')||nomeLower.includes('camiseta'))cat='camisa';
+          if(!cat){
+          if(cats.includes('pokemon')||cats.includes('pokémon')||cats.includes('pkm')||cats.includes('carta pokemon')||cats.includes('booster')||cats.includes('tcg')||cats.includes('pacote de cartas'))cat='pokemon';
           else if(cats.includes('funko'))cat='funko';
-          else if(cats.includes('pokemon'))cat='pokemon';
           else if(cats.includes('yugioh')||cats.includes('yu-gi-oh'))cat='yugioh';
           else if(cats.includes('camisa')||cats.includes('camiseta'))cat='camisa';
           else if(cats.includes('tiny'))cat='tinytoy';
-          else cat='manga'; // padrão para WooCommerce da Amora (só mangás)
+          else if(cats.includes('manga')||cats.includes('editora')||cats.includes('jbc')||cats.includes('panini')||cats.includes('volume'))cat='manga';
+          else cat='manga'; // padrão para WooCommerce da Amora
+          }
         }
 
         // Quantidade — aceita "Estoque" (WooCommerce) ou "qtd" (sistema)
