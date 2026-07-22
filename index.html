@@ -830,8 +830,9 @@ function processImportRows(rows,filename){
 
         // Imagem — aceita URL direta (WooCommerce exporta URL completa)
         const imagem=String(r.imagem||r.Imagem||r.Imagens||r.imagens||'').trim().split('|')[0].trim()||null;
+        const dataEntrada=String(r.data_entrada||r.data||r.Data||'').trim()||todayStr();
 
-        return {nome,cat,qtd,preco,canal,obs,data_entrada:todayStr(),imagem:imagem||null};
+        return {nome,cat,qtd,preco,canal,obs,data_entrada:dataEntrada,imagem:imagem||null};
       }).filter(r=>r&&r.nome);
 
       if(!importData.length){showImportErro('Nenhum produto válido encontrado. Verifique se o arquivo tem uma coluna "Nome" ou "nome".');return;}
