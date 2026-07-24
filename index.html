@@ -1171,8 +1171,16 @@ function renderPainel(){const mes=document.getElementById('painel-mes')?.value||
 // ============ ORDENAÇÃO DE TABELAS ============
 function sortRows(rows,field,dir){
   const mul=dir==='asc'?1:-1;
+  const isDateField=field==='data_pedido'||field==='data_entrada'||field==='data_proposta';
   return[...rows].sort((a,b)=>{
     let va=a[field],vb=b[field];
+    // Datas nulas vão para o final
+    if(isDateField){
+      if(!va&&!vb)return 0;
+      if(!va)return 1;
+      if(!vb)return -1;
+      return String(va).localeCompare(String(vb))*mul;
+    }
     if(va==null)va='';if(vb==null)vb='';
     const na=parseFloat(va),nb=parseFloat(vb);
     if(typeof va==='number'&&typeof vb==='number')return(va-vb)*mul;
