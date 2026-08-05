@@ -76,6 +76,10 @@ tr:hover td{background:var(--bg)}
 .badge-zerado{background:#FCEBEB;color:#791F1F}.badge-pendente{background:#FAEEDA;color:#633806}.badge-confirmado{background:#EAF3DE;color:#27500A}
 .badge-enviado{background:#E6F1FB;color:#0C447C}.badge-cancelado{background:#FCEBEB;color:#791F1F}.badge-avaliando{background:#FAEEDA;color:#633806}
 .badge-aceito{background:#EAF3DE;color:#27500A}.badge-recusado{background:#FCEBEB;color:#791F1F}.badge-canal{background:var(--surface2);color:var(--text2)}.badge-entrega-sm{font-size:10px!important;padding:2px 6px!important;white-space:normal!important;line-height:1.3!important;text-align:center}
+.update-banner{position:fixed;top:68px;left:50%;transform:translateX(-50%);background:#1A1410;color:#fff;padding:8px 18px;border-radius:99px;font-size:13px;font-weight:600;z-index:150;display:none;align-items:center;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,0.2);animation:slideDown 0.2s ease}
+.update-banner.show{display:flex}
+@keyframes slideDown{from{transform:translateX(-50%) translateY(-10px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
+.update-banner button{background:var(--amora);color:#fff;border:none;padding:4px 12px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Nunito Sans',sans-serif}
 .badge-dona{background:#FBEAF0;color:#72243E}.badge-funcionaria{background:#EAF3DE;color:#27500A}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
 .modal-bg.open{display:flex}
@@ -1085,6 +1089,54 @@ function limparWoo(){
   document.getElementById('btn-importar-woo').disabled=true;
 }
 
+// ============ POLLING DE ATUALIZAÇÕES ============
+let ultimaVerificacao={pedidos:null,produtos:null,consig:null};
+let bannerAberto=false;
+
+async function verificarAtualizacoes(){
+  if(bannerAberto)return;
+  try{
+    // Verifica apenas contagem e último ID — muito mais leve que recarregar tudo
+    const [rPed,rProd,rCon]=await Promise.all([
+      fetch(`${SUPA_URL}/rest/v1/pedidos?select=id&order=id.desc&limit=1`,{headers:H}),
+      fetch(`${SUPA_URL}/rest/v1/produtos?select=id,qtd&order=id.desc&limit=1`,{headers:H}),
+      fetch(`${SUPA_URL}/rest/v1/consig?select=id&order=id.desc&limit=1`,{headers:H})
+    ]);
+    const [dPed,dProd,dCon]=await Promise.all([rPed.json(),rProd.json(),rCon.json()]);
+    const ultimoPed=dPed[0]?.id;
+    const ultimoProd=dProd[0]?.id;
+    const ultimoCon=dCon[0]?.id;
+
+    let temAtualizacao=false;
+    const msgs=[];
+
+    if(ultimaVerificacao.pedidos!==null&&ultimoPed!==ultimaVerificacao.pedidos){temAtualizacao=true;msgs.push('novos pedidos');}
+    if(ultimaVerificacao.produtos!==null&&ultimoProd!==ultimaVerificacao.produtos){temAtualizacao=true;msgs.push('estoque atualizado');}
+    if(ultimaVerificacao.consig!==null&&ultimoCon!==ultimaVerificacao.consig){temAtualizacao=true;msgs.push('consignações');}
+
+    ultimaVerificacao={pedidos:ultimoPed,produtos:ultimoProd,consig:ultimoCon};
+
+    if(temAtualizacao){
+      document.getElementById('update-banner-msg').textContent=`Há atualizações: ${msgs.join(', ')}`;
+      document.getElementById('update-banner').classList.add('show');
+      bannerAberto=true;
+    }
+  }catch(e){}
+}
+
+async function aplicarAtualizacoes(){
+  fecharBanner();
+  await Promise.all([loadEstoque(),loadPedidos(),loadConsig()]);
+  const pagAtual=document.querySelector('.page.active')?.id?.replace('page-','');
+  if(pagAtual==='painel')renderPainel();
+  toast('Sistema atualizado!');
+}
+
+function fecharBanner(){
+  document.getElementById('update-banner').classList.remove('show');
+  bannerAberto=false;
+}
+
 function goPage(p){
   // bloqueia acesso a páginas restritas para funcionária
   if(perfilAtual!=='dona'&&(p==='painel'||p==='consig')){toast('Acesso restrito.','error');return;}
@@ -1093,6 +1145,7 @@ function goPage(p){
   document.getElementById('page-'+p).classList.add('active');
   document.getElementById('tab-'+p).classList.add('active');
   if(p==='painel')renderPainel();
+  // Não recarrega dados ao trocar de aba — só renderiza o que já está em memória
 }
 
 // ============ REFRESH POR ABA ============
