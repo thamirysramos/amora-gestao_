@@ -532,6 +532,16 @@ tr:hover td{background:var(--bg)}
       <div class="import-preview" id="import-preview-list"></div>
       <div style="margin-top:8px;font-size:13px;color:var(--text2)">Total: <strong id="import-total">0</strong> produtos encontrados</div>
     </div>
+    <div id="import-opcoes" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+      <div class="form-row"><label>Categoria dos produtos</label>
+        <select id="import-cat" onchange="atualizarOpcoesImport()"></select>
+      </div>
+      <label id="import-substituir-wrap" style="display:none;align-items:flex-start;gap:8px;font-size:13px;color:var(--text2);cursor:pointer">
+        <input type="checkbox" id="import-substituir" onchange="atualizarOpcoesImport()" style="margin-top:3px">
+        <span>Substituir os produtos atuais dessa categoria pelos da planilha</span>
+      </label>
+      <div id="import-substituir-aviso" style="display:none;background:#FAEEDA;border:1px solid #EF9F27;border-radius:var(--radius);padding:8px 12px;font-size:12px;color:#633806;margin-top:8px"></div>
+    </div>
     <div id="import-erro" style="display:none;background:#FCEBEB;border:1px solid #F09595;border-radius:var(--radius);padding:8px 12px;font-size:13px;color:#791F1F;margin-top:10px"></div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeModal('modal-importar');limparImport()">Cancelar</button>
@@ -877,7 +887,7 @@ function processImportRows(rows,filename){
 
       importData=rows.map(r=>{
         // Nome — aceita coluna "Nome" (WooCommerce) ou "nome" (modelo do sistema)
-        const nome=String(r.nome||r.Nome||r.Produto||r.PRODUTO||'').trim();
+        const nome=String(r.nome||r.Nome||r.Name||r.Produto||r.PRODUTO||'').trim();
         if(!nome)return null;
         const nomeLower=nome.toLowerCase();
 
@@ -885,7 +895,7 @@ function processImportRows(rows,filename){
         let cat=String(r.cat||r.Categoria||r.categoria||'').trim().toLowerCase();
         if(cat&&!CATS[cat]){const sc=slugCat(cat);const achada=Object.entries(CATS).find(([k,n])=>k===sc||slugCat(n)===sc);cat=achada?achada[0]:'';}
         if(!cat||cat===''){
-          const cats=String(r.Categorias||r.categorias||'').toLowerCase();
+          const cats=String(r.Categorias||r.categorias||r.Categories||'').toLowerCase();
           // Tenta detectar pelo nome do produto também
           if(nomeLower.includes('funko'))cat='funko';
           else if(nomeLower.includes('yu-gi-oh')||nomeLower.includes('yugioh'))cat='yugioh';
@@ -903,11 +913,11 @@ function processImportRows(rows,filename){
         }
 
         // Quantidade — aceita "Estoque" (WooCommerce) ou "qtd" (sistema)
-        const qtdRaw=String(r.qtd||r.Estoque||r.Quantidade||r.quantidade||'0').trim();
+        const qtdRaw=String(r.qtd||r.Estoque||r.Stock||r.Quantidade||r.quantidade||'0').trim();
         const qtd=parseInt(qtdRaw)||0;
 
         // Preço — aceita "29,90" (BR), "1.234,56" (BR com milhar) ou "29.90" (US)
-        const preco=parsePrecoBR(r.preco||r.Preço||r.Precio||'0');
+        const preco=parsePrecoBR(r.preco||r.Preço||r['Preço normal']||r['Regular price']||r.Precio||'0');
 
         // Canal
         let canal=String(r.canal||r.Canal||'site').trim().toLowerCase();
@@ -917,7 +927,7 @@ function processImportRows(rows,filename){
         const obs=String(r.obs||r.Obs||r.observações||r.Tags||r.tags||'').trim();
 
         // Imagem — aceita URL direta (WooCommerce exporta URL completa)
-        const imagem=String(r.imagem||r.Imagem||r.Imagens||r.imagens||'').trim().split('|')[0].trim()||null;
+        const imagem=String(r.imagem||r.Imagem||r.Imagens||r.imagens||r.Images||'').trim().split('|')[0].trim()||null;
         const dataEntrada=String(r.data_entrada||r.data||r.Data||'').trim()||todayStr();
 
         return {nome,cat,qtd,preco,canal,obs,data_entrada:dataEntrada,imagem:imagem||null};
@@ -931,25 +941,69 @@ function processImportRows(rows,filename){
       const preview=importData.slice(0,5).map(r=>`<div class="import-row"><span>${r.nome}</span><span>${CATS[r.cat]||r.cat} · ${r.qtd} un · ${fmtMoney(r.preco)}${r.imagem?' 🖼':''}</span></div>`).join('');
       document.getElementById('import-preview-list').innerHTML=preview+`<div class="import-row" style="margin-top:6px;color:var(--text3)"><span>📸 ${comFoto} produtos com foto vinculada</span></div>`;
       document.getElementById('import-preview').style.display='block';
+      prepararOpcoesImport();
       document.getElementById('btn-importar').disabled=false;
   }catch(err){showImportErro('Erro ao processar o arquivo: '+err.message);}
 }
 function showImportErro(msg){const el=document.getElementById('import-erro');el.textContent=msg;el.style.display='block';}
+function prepararOpcoesImport(){
+  const sel=document.getElementById('import-cat');
+  sel.innerHTML='<option value="">Detectar automaticamente</option>'+Object.entries(CATS).map(([k,n])=>`<option value="${k}">Todos como: ${escHtmlCat(n)}</option>`).join('');
+  sel.value='';document.getElementById('import-substituir').checked=false;
+  document.getElementById('import-opcoes').style.display='block';
+  atualizarOpcoesImport();
+}
+function atualizarOpcoesImport(){
+  const cat=document.getElementById('import-cat').value;
+  const wrap=document.getElementById('import-substituir-wrap'),chk=document.getElementById('import-substituir'),aviso=document.getElementById('import-substituir-aviso');
+  wrap.style.display=cat?'flex':'none';if(!cat)chk.checked=false;
+  const n=cat?produtos.filter(p=>p.cat===cat).length:0;
+  if(chk.checked){aviso.style.display='block';aviso.innerHTML=`⚠️ Os <strong>${n}</strong> produtos atuais de <strong>${escHtmlCat(CATS[cat]||cat)}</strong> serão apagados e substituídos pelos <strong>${importData.length}</strong> da planilha. Produtos de outras categorias não são afetados. Pedidos antigos continuam com o nome do produto.`;}
+  else aviso.style.display='none';
+  const btn=document.getElementById('btn-importar');
+  btn.innerHTML=chk.checked?'<i class="ti ti-replace"></i> Substituir produtos':'<i class="ti ti-check"></i> Importar produtos';
+}
 async function confirmarImport(){
   if(!importData.length)return;
+  const cat=document.getElementById('import-cat')?.value||'';
+  const substituir=!!(cat&&document.getElementById('import-substituir')?.checked);
+  const dados=cat?importData.map(r=>({...r,cat})):importData;
+  const antigos=substituir?produtos.filter(p=>p.cat===cat):[];
+  if(substituir&&!confirm(`Apagar os ${antigos.length} produtos atuais de "${CATS[cat]||cat}" e importar ${dados.length} novos no lugar?\n\nEssa ação não pode ser desfeita.`))return;
   const btn=document.getElementById('btn-importar');
-  btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Importando...';
+  btn.disabled=true;
   setSyncing(true);
   try{
-    const res=await dbInsert('produtos',importData);
-    if(Array.isArray(res))produtos.push(...res);
-    toast(`${importData.length} produtos importados com sucesso!`);
+    // 1) importa os novos primeiro (se falhar, nada é apagado)
+    const novos=[];
+    for(let i=0;i<dados.length;i+=500){
+      btn.innerHTML=`<i class="ti ti-loader"></i> Importando ${Math.min(i+500,dados.length)}/${dados.length}...`;
+      const res=await dbInsert('produtos',dados.slice(i,i+500));
+      if(Array.isArray(res))novos.push(...res);
+    }
+    produtos.push(...novos);
+    // 2) remove os antigos da categoria
+    if(substituir&&antigos.length){
+      const ids=antigos.map(p=>p.id);
+      for(let i=0;i<ids.length;i+=200){
+        btn.innerHTML=`<i class="ti ti-loader"></i> Removendo antigos ${Math.min(i+200,ids.length)}/${ids.length}...`;
+        const lote=ids.slice(i,i+200).join(',');
+        // desvincula itens de pedidos antigos (o nome do produto continua salvo no item)
+        const ri=await fetch(`${SUPA_URL}/rest/v1/pedido_itens?produto_id=in.(${lote})`,{method:'PATCH',headers:H,body:JSON.stringify({produto_id:null})});
+        if(!ri.ok)throw new Error('Itens de pedido: '+await ri.text());
+        const rd=await fetch(`${SUPA_URL}/rest/v1/produtos?id=in.(${lote})`,{method:'DELETE',headers:H});
+        if(!rd.ok)throw new Error(await rd.text());
+      }
+      for(const p of antigos){if(p.imagem)await deleteFotoStorage(p.imagem);}
+      const del=new Set(ids);produtos=produtos.filter(p=>!del.has(p.id));
+      toast(`${novos.length} produtos importados e ${antigos.length} antigos removidos!`);
+    }else toast(`${novos.length} produtos importados com sucesso!`);
     closeModal('modal-importar');limparImport();
     buildMesOptions('filter-mes-estoque','data_entrada',produtos);renderEstoque();
-  }catch(e){showImportErro('Erro ao importar: '+e.message);}
-  finally{setSyncing(false);btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> Importar produtos';}
+  }catch(e){showImportErro('Erro ao importar: '+e.message+' — clique em "Atualizar" no estoque para ver o estado atual.');}
+  finally{setSyncing(false);btn.disabled=false;atualizarOpcoesImport();}
 }
-function limparImport(){importData=[];document.getElementById('import-input').value='';document.getElementById('import-preview').style.display='none';document.getElementById('import-erro').style.display='none';document.getElementById('import-label').textContent='Clique para selecionar o arquivo (.xlsx ou .csv)';document.getElementById('btn-importar').disabled=true;}
+function limparImport(){importData=[];const op=document.getElementById('import-opcoes');if(op)op.style.display='none';document.getElementById('import-input').value='';document.getElementById('import-preview').style.display='none';document.getElementById('import-erro').style.display='none';document.getElementById('import-label').textContent='Clique para selecionar o arquivo (.xlsx ou .csv)';document.getElementById('btn-importar').disabled=true;}
 
 function baixarModelo(){
   const ws=XLSX.utils.aoa_to_sheet([
