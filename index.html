@@ -180,6 +180,14 @@ tr:hover td{background:var(--bg)}
 .item-row select,.item-row input{padding:6px 8px;border:1px solid var(--border-med);border-radius:var(--radius);font-size:12px;background:var(--surface);color:var(--text);font-family:'Nunito Sans',sans-serif;width:100%}
 .item-row select:focus,.item-row input:focus{outline:none;border-color:var(--amora)}
 .item-estoque-info{font-size:11px;margin-top:2px;padding:0 2px}
+.prod-picker{position:relative}
+.prod-picker-list{display:none;position:absolute;z-index:30;top:calc(100% + 2px);left:0;right:0;max-height:260px;overflow-y:auto;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--radius);box-shadow:var(--shadow-md)}
+.prod-picker-list.open{display:block}
+.prod-picker-item{display:flex;justify-content:space-between;gap:8px;padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border)}
+.prod-picker-item:last-child{border-bottom:none}
+.prod-picker-item:hover,.prod-picker-item.ativo{background:var(--amora-light)}
+.prod-picker-item small{color:var(--text3);white-space:nowrap}
+.prod-picker-vazio{padding:8px 10px;font-size:12px;color:var(--text3)}
 .estoque-ok{color:#3B6D11}.estoque-baixo{color:#BA7517}.estoque-zero{color:#A32D2D}
 .itens-resumo{background:var(--surface);border-radius:var(--radius);padding:8px 10px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:13px;border:1px solid var(--border)}
 .itens-resumo strong{font-family:'Nunito',sans-serif;font-size:15px;color:var(--amora)}
@@ -1326,8 +1334,9 @@ function addItemRow(prodId='',qtd=1,preco='',nomeOriginal=''){
   const existe=!!matched;
   const staleOpt=(prodIdOriginal&&!existe)?`<option value="${prodIdOriginal}" data-preco="${preco}" data-nome="${String(nomeOriginal||'Produto').replace(/"/g,'&quot;')}" data-stale="1" selected>⚠ ${nomeOriginal||'Produto'} (não encontrado no estoque atual)</option>`:'';
   const opts=produtos.map(p=>`<option value="${p.id}" data-preco="${p.preco}" data-nome="${String(p.nome).replace(/"/g,'&quot;')}" data-estoque="${p.qtd}" ${p.id==prodId?'selected':''}>${p.nome} (${p.qtd} em estoque)</option>`).join('');
-  div.innerHTML=`<div><select onchange="onItemProdChange(${id})" id="item-prod-${id}"><option value="">— selecionar produto —</option>${staleOpt}${opts}</select><div class="item-estoque-info" id="item-info-${id}"></div></div><input type="number" id="item-qtd-${id}" min="1" value="${qtd}" oninput="calcTotal()"><input type="number" id="item-preco-${id}" step="0.01" value="${preco}" oninput="calcTotal()"><button type="button" class="btn-danger" onclick="removeItemRow(${id})"><i class="ti ti-x"></i></button>`;
+  div.innerHTML=`<div class="prod-picker"><input type="text" id="item-busca-${id}" placeholder="🔍 Buscar produto (ex: aluguel 13)" autocomplete="off" oninput="buscarProdItem(${id})" onfocus="buscarProdItem(${id})" onkeydown="teclaProdItem(event,${id})" onblur="setTimeout(()=>fecharProdItem(${id}),150)"><div class="prod-picker-list" id="item-lista-${id}"></div><select onchange="onItemProdChange(${id})" id="item-prod-${id}" style="display:none"><option value="">— selecionar produto —</option>${staleOpt}${opts}</select><div class="item-estoque-info" id="item-info-${id}"></div></div><input type="number" id="item-qtd-${id}" min="1" value="${qtd}" oninput="calcTotal()"><input type="number" id="item-preco-${id}" step="0.01" value="${preco}" oninput="calcTotal()"><button type="button" class="btn-danger" onclick="removeItemRow(${id})"><i class="ti ti-x"></i></button>`;
   document.getElementById('itens-lista').appendChild(div);
+  {const sel=document.getElementById(`item-prod-${id}`);const o=sel.options[sel.selectedIndex];if(o&&o.value)document.getElementById(`item-busca-${id}`).value=o.dataset.nome||'';}
   if(staleOpt){
     document.getElementById(`item-info-${id}`).innerHTML=`<span class="estoque-zero">⚠ Produto não encontrado no estoque atual (nem por ID, nem por nome) — nome e preço foram preservados. Selecione o produto correspondente para vincular ao estoque, ou deixe assim para manter como item avulso.</span>`;
   }else if(prodId){
@@ -1340,6 +1349,61 @@ function addItemRow(prodId='',qtd=1,preco='',nomeOriginal=''){
   calcTotal();
 }
 function removeItemRow(id){document.getElementById(`item-row-${id}`)?.remove();calcTotal();}
+// ===== Busca de produto no pedido: palavras em qualquer ordem/posição, sem acento =====
+function normBusca(t){return String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
+function filtrarProdutosBusca(q){
+  const semZero=t=>t.replace(/\b0+(\d)/g,'$1'); // "01" = "1"
+  const tokens=semZero(normBusca(q)).split(' ').filter(Boolean);
+  if(!tokens.length)return [];
+  const ult=tokens.length-1,res=[];
+  for(const p of produtos){
+    const n=' '+semZero(normBusca(p.nome))+' ';
+    let exato=true;
+    const ok=tokens.every((t,i)=>{
+      if(!/^\d+$/.test(t))return n.includes(t);
+      if(n.includes(' '+t+' '))return true;          // número inteiro: "13" acha o vol. 13
+      if(i===ult&&n.includes(' '+t)){exato=false;return true;} // ainda digitando: "1" acha 13, 113...
+      return false;
+    });
+    if(ok)res.push({p,exato});
+  }
+  return res.sort((a,b)=>(b.exato-a.exato)||String(a.p.nome).localeCompare(String(b.p.nome),'pt-BR',{numeric:true})).map(r=>r.p);
+}
+const prodPickerAtivo={};
+function buscarProdItem(id){
+  const q=document.getElementById(`item-busca-${id}`).value;
+  const lista=document.getElementById(`item-lista-${id}`);
+  const sel=document.getElementById(`item-prod-${id}`);
+  const atual=sel.options[sel.selectedIndex];
+  if(atual&&atual.value&&q===(atual.dataset.nome||'')){lista.classList.remove('open');return;}
+  if(!normBusca(q)){lista.innerHTML='<div class="prod-picker-vazio">Digite partes do nome, em qualquer ordem — ex: <b>aluguel 13</b></div>';lista.classList.add('open');return;}
+  const achados=filtrarProdutosBusca(q),mostrar=achados.slice(0,60);
+  prodPickerAtivo[id]=mostrar.length?0:-1;
+  lista.innerHTML=mostrar.length?mostrar.map((p,i)=>`<div class="prod-picker-item${i===0?' ativo':''}" data-id="${p.id}" onmousedown="event.preventDefault();escolherProdItem(${id},${p.id})"><span>${escHtmlCat(p.nome)}</span><small>${p.qtd} em estoque</small></div>`).join('')+(achados.length>60?`<div class="prod-picker-vazio">+${achados.length-60} resultados — digite mais para refinar</div>`:''):'<div class="prod-picker-vazio">Nenhum produto encontrado</div>';
+  lista.classList.add('open');
+}
+function teclaProdItem(e,id){
+  const lista=document.getElementById(`item-lista-${id}`);const itens=[...lista.querySelectorAll('.prod-picker-item')];
+  if(e.key==='Escape'){fecharProdItem(id);return;}
+  if(!itens.length)return;
+  let i=prodPickerAtivo[id]??0;
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();i=e.key==='ArrowDown'?Math.min(i+1,itens.length-1):Math.max(i-1,0);}
+  else if(e.key==='Enter'){e.preventDefault();if(itens[i])escolherProdItem(id,parseInt(itens[i].dataset.id));return;}
+  else return;
+  prodPickerAtivo[id]=i;itens.forEach((el,k)=>el.classList.toggle('ativo',k===i));itens[i].scrollIntoView({block:'nearest'});
+}
+function escolherProdItem(id,prodId){
+  const sel=document.getElementById(`item-prod-${id}`);sel.value=String(prodId);
+  const o=sel.options[sel.selectedIndex];document.getElementById(`item-busca-${id}`).value=o?.dataset?.nome||'';
+  fecharProdItem(id);onItemProdChange(id);
+}
+function fecharProdItem(id){
+  const lista=document.getElementById(`item-lista-${id}`);if(lista)lista.classList.remove('open');
+  // se apagou o texto, desmarca o produto; se digitou algo sem escolher, volta pro nome do produto escolhido
+  const inp=document.getElementById(`item-busca-${id}`),sel=document.getElementById(`item-prod-${id}`);if(!inp||!sel)return;
+  if(!inp.value.trim()){if(sel.value){sel.value='';onItemProdChange(id);}}
+  else{const o=sel.options[sel.selectedIndex];inp.value=o&&o.value?(o.dataset.nome||''):'';}
+}
 function onItemProdChange(id){const sel=document.getElementById(`item-prod-${id}`);const opt=sel.options[sel.selectedIndex];const preco=opt?.dataset?.preco||'';const est=parseInt(opt?.dataset?.estoque||0);document.getElementById(`item-preco-${id}`).value=preco?parseFloat(preco).toFixed(2):'';const info=document.getElementById(`item-info-${id}`);if(opt?.dataset?.stale==='1'){info.innerHTML=`<span class="estoque-zero">⚠ Produto não encontrado no estoque atual — nome e preço preservados.</span>`;}else if(opt?.value){if(est===0)info.innerHTML=`<span class="estoque-zero">⚠ Sem estoque</span>`;else if(est<=5)info.innerHTML=`<span class="estoque-baixo">⚠ Estoque baixo: ${est} un</span>`;else info.innerHTML=`<span class="estoque-ok">✓ ${est} em estoque</span>`;}else info.innerHTML='';calcTotal();}
 function calcTotal(){let t=0;document.querySelectorAll('[id^="item-row-"]').forEach(row=>{const id=row.id.replace('item-row-','');const q=parseInt(document.getElementById(`item-qtd-${id}`)?.value)||0;const p=parseFloat(document.getElementById(`item-preco-${id}`)?.value)||0;t+=q*p;});document.getElementById('itens-total').textContent=fmtMoney(t);}
 function getItensForm(){const itens=[];document.querySelectorAll('[id^="item-row-"]').forEach(row=>{const id=row.id.replace('item-row-','');const sel=document.getElementById(`item-prod-${id}`);const prodId=sel?.value;const opt=sel?.options[sel.selectedIndex];const stale=opt?.dataset?.stale==='1';const qtd=parseInt(document.getElementById(`item-qtd-${id}`)?.value)||0;const preco=parseFloat(document.getElementById(`item-preco-${id}`)?.value)||0;const p=produtos.find(x=>x.id==prodId);const nomeProduto=opt?.dataset?.nome||(p?p.nome:'Item avulso');if(qtd>0)itens.push({produto_id:(prodId&&!stale)?parseInt(prodId):null,nome_produto:nomeProduto,quantidade:qtd,preco_unitario:preco});});return itens;}
