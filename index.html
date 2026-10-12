@@ -548,6 +548,7 @@ tr:hover td{background:var(--bg)}
         <input type="checkbox" id="import-substituir" onchange="atualizarOpcoesImport()" style="margin-top:3px">
         <span>Substituir os produtos atuais dessa categoria pelos da planilha</span>
       </label>
+      <div id="import-cats-novas" style="display:none;background:#FAEEDA;border:1px solid #EF9F27;border-radius:var(--radius);padding:10px 12px;font-size:13px;color:#633806;margin-bottom:10px"></div>
       <div id="import-substituir-aviso" style="display:none;background:#FAEEDA;border:1px solid #EF9F27;border-radius:var(--radius);padding:8px 12px;font-size:12px;color:#633806;margin-top:8px"></div>
     </div>
     <div id="import-erro" style="display:none;background:#FCEBEB;border:1px solid #F09595;border-radius:var(--radius);padding:8px 12px;font-size:13px;color:#791F1F;margin-top:10px"></div>
@@ -887,24 +888,40 @@ function handleImportFile(input){
   if(isCSV)reader.readAsText(file,'UTF-8');
   else reader.readAsArrayBuffer(file);
 }
+// Lê uma coluna da planilha ignorando maiúsculas, acentos, espaços e textos entre parênteses
+// ex: "Preço", "PRECO", "Tag (separadas por vírgulas)" -> "preco", "tag"
+function chaveCol(k){return String(k||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\([^)]*\)/g,'').replace(/[^a-z0-9]+/g,'');}
+function pegarCol(r,nomes){
+  if(!r.__n){Object.defineProperty(r,'__n',{value:Object.fromEntries(Object.keys(r).map(k=>[chaveCol(k),r[k]])),enumerable:false});}
+  for(const n of nomes){const v=r.__n[chaveCol(n)];if(v!==undefined&&v!==null&&String(v).trim()!=='')return v;}
+  return '';
+}
 function processImportRows(rows,filename){
   try{
       if(!rows.length){showImportErro('Planilha vazia ou formato inválido.');return;}
 
       const canaisValidos=['site','loja','ambos','whatsapp','instagram'];
 
+      catsNovasImport={};catsNovasDecisao=null;
       importData=rows.map(r=>{
-        // Nome — aceita coluna "Nome" (WooCommerce) ou "nome" (modelo do sistema)
-        const nome=String(r.nome||r.Nome||r.Name||r.Produto||r.PRODUTO||'').trim();
+        // Nome — "nome" (modelo do sistema), "Nome" (WooCommerce / planilha da loja), "Name", "Produto"
+        const nome=String(pegarCol(r,['nome','name','produto','nome do produto'])).trim().replace(/\s+/g,' ');
         if(!nome)return null;
+        // linhas de instrução/cabeçalho repetido (ex: "Nome do produto | Categoria | Quantidade")
+        const qtdTxt=String(pegarCol(r,['qtd','estoque','quantidade','stock'])).trim();
+        if(qtdTxt&&!/^-?[\d.,]+$/.test(qtdTxt))return null;
         const nomeLower=nome.toLowerCase();
 
-        // Categoria — aceita "cat" do sistema ou tenta inferir das categorias do WooCommerce
-        let cat=String(r.cat||r.Categoria||r.categoria||'').trim().toLowerCase();
-        if(cat&&!CATS[cat]){const sc=slugCat(cat);const achada=Object.entries(CATS).find(([k,n])=>k===sc||slugCat(n)===sc);cat=achada?achada[0]:'';}
-        if(!cat||cat===''){
-          const cats=String(r.Categorias||r.categorias||r.Categories||'').toLowerCase();
-          // Tenta detectar pelo nome do produto também
+        // Categoria única do sistema ("cat"/"Categoria") — se não existir, pergunta antes de criar
+        const catTexto=String(pegarCol(r,['cat','categoria'])).trim().replace(/\s+/g,' ');
+        let cat=catTexto.toLowerCase();
+        if(cat&&!CATS[cat]){const sc=slugCat(cat);const achada=Object.entries(CATS).find(([k,n])=>k===sc||slugCat(n)===sc);
+          if(achada)cat=achada[0];
+          else if(sc){cat=sc;if(!catsNovasImport[sc])catsNovasImport[sc]=catTexto;} // ex: "HQ", "Livro"
+          else cat='';}
+        if(!cat){
+          // Categorias do WooCommerce ("Editoras, Panini") — tenta inferir
+          const cats=String(pegarCol(r,['categorias','categories'])).toLowerCase();
           if(nomeLower.includes('funko'))cat='funko';
           else if(nomeLower.includes('yu-gi-oh')||nomeLower.includes('yugioh'))cat='yugioh';
           else if(nomeLower.includes('tiny toy'))cat='tinytoy';
@@ -915,28 +932,23 @@ function processImportRows(rows,filename){
           else if(cats.includes('yugioh')||cats.includes('yu-gi-oh'))cat='yugioh';
           else if(cats.includes('camisa')||cats.includes('camiseta'))cat='camisa';
           else if(cats.includes('tiny'))cat='tinytoy';
-          else if(cats.includes('manga')||cats.includes('editora')||cats.includes('jbc')||cats.includes('panini')||cats.includes('volume'))cat='manga';
+          else if(cats.includes('manga')||cats.includes('mangá')||cats.includes('editora')||cats.includes('jbc')||cats.includes('panini')||cats.includes('newpop')||cats.includes('volume'))cat='manga';
           else cat='manga'; // padrão para WooCommerce da Amora
           }
         }
 
-        // Quantidade — aceita "Estoque" (WooCommerce) ou "qtd" (sistema)
-        const qtdRaw=String(r.qtd||r.Estoque||r.Stock||r.Quantidade||r.quantidade||'0').trim();
-        const qtd=parseInt(qtdRaw)||0;
+        const qtd=parseInt(String(qtdTxt||'0').replace(',','.'))||0;
+        // Preço — aceita número da planilha, "29,90", "R$ 1.234,56" ou "29.90"
+        const preco=parsePrecoBR(pegarCol(r,['preco','preço normal','regular price','preco de venda','valor','precio']));
 
-        // Preço — aceita "29,90" (BR), "1.234,56" (BR com milhar) ou "29.90" (US)
-        const preco=parsePrecoBR(r.preco||r.Preço||r['Preço normal']||r['Regular price']||r.Precio||'0');
-
-        // Canal
-        let canal=String(r.canal||r.Canal||'site').trim().toLowerCase();
+        let canal=String(pegarCol(r,['canal'])||'site').trim().toLowerCase();
         if(!canaisValidos.includes(canal))canal='site';
 
-        // Observações — aceita Tags do WooCommerce como obs
-        const obs=String(r.obs||r.Obs||r.observações||r.Tags||r.tags||'').trim();
+        // Observações — "obs" ou as Tags (ex: "Semi-Novo")
+        const obs=String(pegarCol(r,['obs','observacoes','observação','tags','tag'])).trim();
 
-        // Imagem — aceita URL direta (WooCommerce exporta URL completa)
-        const imagem=String(r.imagem||r.Imagem||r.Imagens||r.imagens||r.Images||'').trim().split('|')[0].trim()||null;
-        const dataEntrada=String(r.data_entrada||r.data||r.Data||'').trim()||todayStr();
+        const imagem=String(pegarCol(r,['imagem','imagens','images','foto'])).trim().split('|')[0].trim()||null;
+        const dataEntrada=normDataImport(pegarCol(r,['data_entrada','data de entrada','data']));
 
         return {nome,cat,qtd,preco,canal,obs,data_entrada:dataEntrada,imagem:imagem||null};
       }).filter(r=>r&&r.nome);
@@ -946,12 +958,41 @@ function processImportRows(rows,filename){
       document.getElementById('import-label').textContent=`✓ ${filename} — ${importData.length} produtos encontrados`;
       document.getElementById('import-total').textContent=importData.length;
       const comFoto=importData.filter(r=>r.imagem).length;
-      const preview=importData.slice(0,5).map(r=>`<div class="import-row"><span>${r.nome}</span><span>${CATS[r.cat]||r.cat} · ${r.qtd} un · ${fmtMoney(r.preco)}${r.imagem?' 🖼':''}</span></div>`).join('');
+      const preview=importData.slice(0,5).map(r=>`<div class="import-row"><span>${escHtmlCat(r.nome)}</span><span>${escHtmlCat(CATS[r.cat]||catsNovasImport[r.cat]||r.cat)} · ${r.qtd} un · ${fmtMoney(r.preco)}${r.imagem?' 🖼':''}</span></div>`).join('');
       document.getElementById('import-preview-list').innerHTML=preview+`<div class="import-row" style="margin-top:6px;color:var(--text3)"><span>📸 ${comFoto} produtos com foto vinculada</span></div>`;
       document.getElementById('import-preview').style.display='block';
       prepararOpcoesImport();
-      document.getElementById('btn-importar').disabled=false;
   }catch(err){showImportErro('Erro ao processar o arquivo: '+err.message);}
+}
+// Categorias da planilha que não existem: pergunta se cria ou manda para "Outro"
+let catsNovasDecisao=null;
+function renderCatsNovasImport(){
+  const box=document.getElementById('import-cats-novas');if(!box)return true;
+  const override=document.getElementById('import-cat')?.value;
+  const novas=Object.entries(catsNovasImport).filter(([slug])=>!CATS[slug]&&importData.some(r=>r.cat===slug));
+  if(!novas.length||override){box.style.display='none';return true;}
+  const lista=novas.map(([slug,nome])=>`<strong>${escHtmlCat(nome)}</strong> (${importData.filter(r=>r.cat===slug).length})`).join(', ');
+  box.style.display='block';
+  if(catsNovasDecisao==='criar')box.innerHTML=`✅ Serão criadas as categorias: ${lista}. <button type="button" class="btn-link" onclick="decidirCatsNovas(null)">alterar</button>`;
+  else if(catsNovasDecisao==='outro')box.innerHTML=`➡️ Os produtos de ${lista} vão entrar como <strong>Outro</strong>. <button type="button" class="btn-link" onclick="decidirCatsNovas(null)">alterar</button>`;
+  else box.innerHTML=`⚠️ Estas categorias da planilha <strong>não existem</strong> no sistema: ${lista}.<br>Deseja criá-las?<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button type="button" class="btn-primary btn-sm" onclick="decidirCatsNovas('criar')"><i class="ti ti-plus"></i> Sim, criar categorias</button><button type="button" class="btn-ghost btn-sm" onclick="decidirCatsNovas('outro')">Não, importar como "Outro"</button></div>`;
+  return !!catsNovasDecisao;
+}
+function decidirCatsNovas(d){
+  if(d==='criar'&&perfilAtual!=='dona'){toast('Só a dona pode criar categorias.','error');d='outro';}
+  catsNovasDecisao=d;atualizarOpcoesImport();
+}
+let catsNovasImport={};
+// Datas da planilha: aceita data do Excel (número ou Date), "AAAA-MM-DD" e "DD/MM/AAAA"; qualquer outra coisa vira hoje
+function normDataImport(v){
+  const pad=n=>String(n).padStart(2,'0');
+  if(v instanceof Date&&!isNaN(v))return `${v.getFullYear()}-${pad(v.getMonth()+1)}-${pad(v.getDate())}`;
+  if(typeof v==='number'&&v>20000&&v<80000){const d=new Date(Math.round((v-25569)*86400000));return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;}
+  const t=String(v??'').trim();let m;
+  if((m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)))return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  if((m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)))return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
+  if(/^\d{5}(\.\d+)?$/.test(t))return normDataImport(parseFloat(t));
+  return todayStr();
 }
 function showImportErro(msg){const el=document.getElementById('import-erro');el.textContent=msg;el.style.display='block';}
 function prepararOpcoesImport(){
@@ -969,19 +1010,35 @@ function atualizarOpcoesImport(){
   if(chk.checked){aviso.style.display='block';aviso.innerHTML=`⚠️ Os <strong>${n}</strong> produtos atuais de <strong>${escHtmlCat(CATS[cat]||cat)}</strong> serão apagados e substituídos pelos <strong>${importData.length}</strong> da planilha. Produtos de outras categorias não são afetados. Pedidos antigos continuam com o nome do produto.`;}
   else aviso.style.display='none';
   const btn=document.getElementById('btn-importar');
+  btn.disabled=!renderCatsNovasImport();
   btn.innerHTML=chk.checked?'<i class="ti ti-replace"></i> Substituir produtos':'<i class="ti ti-check"></i> Importar produtos';
 }
 async function confirmarImport(){
   if(!importData.length)return;
   const cat=document.getElementById('import-cat')?.value||'';
   const substituir=!!(cat&&document.getElementById('import-substituir')?.checked);
-  const dados=cat?importData.map(r=>({...r,cat})):importData;
+  const dados=importData.map(r=>cat?{...r,cat}:{...r});
   const antigos=substituir?produtos.filter(p=>p.cat===cat):[];
   if(substituir&&!confirm(`Apagar os ${antigos.length} produtos atuais de "${CATS[cat]||cat}" e importar ${dados.length} novos no lugar?\n\nEssa ação não pode ser desfeita.`))return;
   const btn=document.getElementById('btn-importar');
   btn.disabled=true;
   setSyncing(true);
   try{
+    // 0) cria categorias novas que vieram na planilha
+    const pendentes=Object.keys(catsNovasImport).filter(sl=>!CATS[sl]&&dados.some(r=>r.cat===sl));
+    if(!cat&&pendentes.length&&catsNovasDecisao!=='criar'){
+      if(catsNovasDecisao!=='outro'){toast('Escolha o que fazer com as categorias novas.','error');return;}
+      dados.forEach(r=>{if(pendentes.includes(r.cat))r.cat='outro';});
+    }
+    if(!cat&&catsNovasDecisao==='criar'){
+      const cores=Object.keys(CAT_CORES);let k=categoriasCustom.length;
+      for(const [slug,nome] of Object.entries(catsNovasImport)){
+        if(CATS[slug]||!dados.some(r=>r.cat===slug))continue;
+        btn.innerHTML=`<i class="ti ti-loader"></i> Criando categoria ${escHtmlCat(nome)}...`;
+        const res=await dbInsert('categorias',{slug,nome,cor:cores[(k++)%cores.length]});categoriasCustom.push(res[0]);
+      }
+      rebuildCats();
+    }
     // 1) importa os novos primeiro (se falhar, nada é apagado)
     const novos=[];
     for(let i=0;i<dados.length;i+=500){
