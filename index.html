@@ -340,7 +340,7 @@ tr:hover td{background:var(--bg)}
         <th style="width:12%" class="th-sortable" onclick="sortPedidosBy('cliente')">Cliente <span class="sort-ind" id="sort-ind-pedidos-cliente"></span></th>
         <th style="width:22%">Produtos</th>
         <th style="width:6%" class="th-sortable" onclick="sortPedidosBy('canal')">Canal <span class="sort-ind" id="sort-ind-pedidos-canal"></span></th>
-        <th style="width:8%" class="th-sortable" onclick="sortPedidosBy('valor')">Valor <span class="sort-ind" id="sort-ind-pedidos-valor"></span></th>
+        <th style="width:8%" class="th-sortable col-valor-pedido" onclick="sortPedidosBy('valor')">Valor <span class="sort-ind" id="sort-ind-pedidos-valor"></span></th>
         <th style="width:9%" class="th-sortable" onclick="sortPedidosBy('status')">Status <span class="sort-ind" id="sort-ind-pedidos-status"></span></th>
         <th style="width:16%">Entrega</th>
         <th style="width:8%" class="th-sortable" onclick="sortPedidosBy('data_pedido')">Data <span class="sort-ind" id="sort-ind-pedidos-data_pedido"></span></th>
@@ -741,6 +741,8 @@ function buildMesOptions(id,campo,dados){const sel=document.getElementById(id);c
 function aplicarPerfil(perfil) {
   perfilAtual = perfil;
   const isDona = perfil === 'dona';
+  // esconde título e células da coluna Valor juntos (senão a tabela desalinha)
+  document.body.classList.toggle('perfil-funcionaria', !isDona);
 
   // mostra/esconde abas e pages exclusivas da dona
   document.querySelectorAll('.dona-only').forEach(el => {
@@ -758,10 +760,6 @@ function aplicarPerfil(perfil) {
     goPage('estoque');
   }
 
-  // funcionária não vê preço na tabela de pedidos
-  if (!isDona) {
-    document.querySelectorAll('.col-valor-pedido').forEach(el => el.style.display = 'none');
-  }
 }
 
 function openModal(id){document.getElementById(id).classList.add('open');}
@@ -1532,7 +1530,7 @@ function renderPedidos(){const search=(document.getElementById('search-pedidos')
   const isDona=perfilAtual==='dona';
   document.getElementById('stats-pedidos').innerHTML=`<div class="stat-card"><div class="slabel">Total de pedidos</div><div class="svalue">${total}</div></div><div class="stat-card"><div class="slabel">Pendentes</div><div class="svalue" style="color:#BA7517">${pend}</div><div class="ssub">aguardando ação</div></div>${isDona?`<div class="stat-card"><div class="slabel">Faturamento</div><div class="svalue" style="font-size:18px">${fmtMoney(fat)}</div></div>`:''}<div class="stat-card"><div class="slabel">Via WhatsApp</div><div class="svalue">${wpp}</div></div>`;
   const tbody=document.getElementById('tbody-pedidos');if(!peds.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><i class="ti ti-shopping-cart"></i><p>Nenhum pedido encontrado</p></div></td></tr>`;return;}
-  tbody.innerHTML=peds.map(p=>{const itens=pedidoItens[p.id]||[];const itensStr=itens.length?itens.map(it=>`${it.nome_produto}(${it.quantidade}x)`).join(', '):(p.produto||'—');return`<tr><td style="color:var(--text3);font-size:11px;font-weight:700">#${p.id}</td><td title="${p.cliente||''}">${p.cliente||''}</td><td title="${itensStr}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${itensStr}</td><td><span class="badge badge-canal">${CANAIS[p.canal]||p.canal||'—'}</span></td><td class="col-valor-pedido" ${!isDona?'style="display:none"':''}>${fmtMoney(p.valor)}</td><td>${statusPedBadge(p.status)}</td><td style="white-space:normal;font-size:12px">${entregaBadge(p.tipo_entrega,p.loja)}</td><td style="color:var(--text3);font-size:12px">${fmtDate(p.data_pedido)}</td><td><div style="display:flex;gap:4px;align-items:center"><button class="btn-ghost" onclick="editPedido(${p.id})"><i class="ti ti-edit"></i></button><button class="btn-ghost" onclick="avancaStatus(${p.id})"><i class="ti ti-arrow-right"></i></button><button class="btn-danger" onclick="deletePedido(${p.id})"><i class="ti ti-trash"></i></button></div></td></tr>`;}).join('');updateBadges();}
+  tbody.innerHTML=peds.map(p=>{const itens=pedidoItens[p.id]||[];const itensStr=itens.length?itens.map(it=>`${it.nome_produto}(${it.quantidade}x)`).join(', '):(p.produto||'—');return`<tr><td style="color:var(--text3);font-size:11px;font-weight:700">#${p.id}</td><td title="${p.cliente||''}">${p.cliente||''}</td><td title="${itensStr}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${itensStr}</td><td><span class="badge badge-canal">${CANAIS[p.canal]||p.canal||'—'}</span></td><td class="col-valor-pedido">${fmtMoney(p.valor)}</td><td>${statusPedBadge(p.status)}</td><td style="white-space:normal;font-size:12px">${entregaBadge(p.tipo_entrega,p.loja)}</td><td style="color:var(--text3);font-size:12px">${fmtDate(p.data_pedido)}</td><td><div style="display:flex;gap:4px;align-items:center"><button class="btn-ghost" onclick="editPedido(${p.id})"><i class="ti ti-edit"></i></button><button class="btn-ghost" onclick="avancaStatus(${p.id})"><i class="ti ti-arrow-right"></i></button><button class="btn-danger" onclick="deletePedido(${p.id})"><i class="ti ti-trash"></i></button></div></td></tr>`;}).join('');updateBadges();}
 function abrirNovoPedido(){document.getElementById('ped-edit-id').value='';document.getElementById('ped-status-anterior').value='';document.getElementById('ped-cliente').value='';document.getElementById('ped-canal').value='whatsapp';document.getElementById('ped-obs').value='';document.getElementById('ped-status').value='pendente';document.getElementById('ped-data').value=todayStr();document.getElementById('ped-entrega').value='';document.getElementById('ped-loja').value='';document.getElementById('row-loja').style.display='none';document.getElementById('itens-lista').innerHTML='';document.getElementById('alerta-estoque').classList.remove('show');itemRowCount=0;addItemRow();document.getElementById('modal-pedido-title').textContent='Registrar pedido';openModal('modal-pedido');}
 function editPedido(id){const p=pedidos.find(x=>x.id===id);if(!p)return;document.getElementById('ped-edit-id').value=id;document.getElementById('ped-status-anterior').value=p.status;document.getElementById('ped-cliente').value=p.cliente||'';document.getElementById('ped-canal').value=p.canal||'whatsapp';document.getElementById('ped-obs').value=p.obs||'';document.getElementById('ped-status').value=p.status||'pendente';document.getElementById('ped-data').value=p.data_pedido||todayStr();document.getElementById('ped-entrega').value=p.tipo_entrega||'';document.getElementById('ped-loja').value=p.loja||'';document.getElementById('row-loja').style.display=(p.tipo_entrega&&p.tipo_entrega!=='envio-online')?'block':'none';document.getElementById('itens-lista').innerHTML='';document.getElementById('alerta-estoque').classList.remove('show');itemRowCount=0;const itens=pedidoItens[id]||[];
 if(itens.length){
