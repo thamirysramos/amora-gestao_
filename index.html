@@ -1395,7 +1395,8 @@ function addItemRow(prodId='',qtd=1,preco='',nomeOriginal=''){
   if(staleOpt){
     document.getElementById(`item-info-${id}`).innerHTML=`<span class="estoque-zero">⚠ Produto não encontrado no estoque atual (nem por ID, nem por nome) — nome e preço foram preservados. Selecione o produto correspondente para vincular ao estoque, ou deixe assim para manter como item avulso.</span>`;
   }else if(prodId){
-    onItemProdChange(id);
+    // ao reabrir um pedido, mantém o preço que foi salvo nele (desconto, carta com valor na hora etc.)
+    onItemProdChange(id,preco!==''&&preco!==null&&preco!==undefined);
     if(religadoPorNome){
       const info=document.getElementById(`item-info-${id}`);
       info.innerHTML=`<span class="estoque-ok">🔗 Religado automaticamente pelo nome (ID antigo não existia mais)</span><br>${info.innerHTML}`;
@@ -1459,8 +1460,17 @@ function fecharProdItem(id){
   if(!inp.value.trim()){if(sel.value){sel.value='';onItemProdChange(id);}}
   else{const o=sel.options[sel.selectedIndex];inp.value=o&&o.value?(o.dataset.nome||''):'';}
 }
-function onItemProdChange(id){const sel=document.getElementById(`item-prod-${id}`);const opt=sel.options[sel.selectedIndex];const preco=opt?.dataset?.preco||'';const est=parseInt(opt?.dataset?.estoque||0);document.getElementById(`item-preco-${id}`).value=preco?parseFloat(preco).toFixed(2):'';const info=document.getElementById(`item-info-${id}`);if(opt?.dataset?.stale==='1'){info.innerHTML=`<span class="estoque-zero">⚠ Produto não encontrado no estoque atual — nome e preço preservados.</span>`;}else if(opt?.value){if(est===0)info.innerHTML=`<span class="estoque-zero">⚠ Sem estoque</span>`;else if(est<=5)info.innerHTML=`<span class="estoque-baixo">⚠ Estoque baixo: ${est} un</span>`;else info.innerHTML=`<span class="estoque-ok">✓ ${est} em estoque</span>`;}else info.innerHTML='';calcTotal();}
-function calcTotal(){let t=0;document.querySelectorAll('[id^="item-row-"]').forEach(row=>{const id=row.id.replace('item-row-','');const q=parseInt(document.getElementById(`item-qtd-${id}`)?.value)||0;const p=parseFloat(document.getElementById(`item-preco-${id}`)?.value)||0;t+=q*p;});document.getElementById('itens-total').textContent=fmtMoney(t);}
+function onItemProdChange(id,manterPreco=false){const sel=document.getElementById(`item-prod-${id}`);const opt=sel.options[sel.selectedIndex];const preco=opt?.dataset?.preco||'';const est=parseInt(opt?.dataset?.estoque||0);if(!manterPreco)document.getElementById(`item-preco-${id}`).value=preco?parseFloat(preco).toFixed(2):'';const info=document.getElementById(`item-info-${id}`);if(opt?.dataset?.stale==='1'){info.innerHTML=`<span class="estoque-zero">⚠ Produto não encontrado no estoque atual — nome e preço preservados.</span>`;}else if(opt?.value){if(est===0)info.innerHTML=`<span class="estoque-zero">⚠ Sem estoque</span>`;else if(est<=5)info.innerHTML=`<span class="estoque-baixo">⚠ Estoque baixo: ${est} un</span>`;else info.innerHTML=`<span class="estoque-ok">✓ ${est} em estoque</span>`;}else info.innerHTML='';calcTotal();}
+function marcarPrecoAjustado(id,p){
+  const sel=document.getElementById(`item-prod-${id}`),info=document.getElementById(`item-info-${id}`);if(!sel||!info)return;
+  const opt=sel.options[sel.selectedIndex];let el=document.getElementById(`item-ajuste-${id}`);
+  if(!el){el=document.createElement('div');el.id=`item-ajuste-${id}`;el.className='item-estoque-info';info.after(el);}
+  const cad=parseFloat(opt?.dataset?.preco);
+  if(opt&&opt.value&&opt.dataset.stale!=='1'&&!isNaN(cad)&&document.getElementById(`item-preco-${id}`).value!==''&&Math.abs(cad-p)>0.004)
+    el.innerHTML=`<span style="color:var(--text3)">💲 Preço do pedido diferente do cadastro (${fmtMoney(cad)})</span>`;
+  else el.innerHTML='';
+}
+function calcTotal(){let t=0;document.querySelectorAll('[id^="item-row-"]').forEach(row=>{const id=row.id.replace('item-row-','');const q=parseInt(document.getElementById(`item-qtd-${id}`)?.value)||0;const p=parseFloat(document.getElementById(`item-preco-${id}`)?.value)||0;t+=q*p;marcarPrecoAjustado(id,p);});document.getElementById('itens-total').textContent=fmtMoney(t);}
 function getItensForm(){const itens=[];document.querySelectorAll('[id^="item-row-"]').forEach(row=>{const id=row.id.replace('item-row-','');const sel=document.getElementById(`item-prod-${id}`);const prodId=sel?.value;const opt=sel?.options[sel.selectedIndex];const stale=opt?.dataset?.stale==='1';const qtd=parseInt(document.getElementById(`item-qtd-${id}`)?.value)||0;const preco=parseFloat(document.getElementById(`item-preco-${id}`)?.value)||0;const p=produtos.find(x=>x.id==prodId);const nomeProduto=opt?.dataset?.nome||(p?p.nome:'Item avulso');if(qtd>0)itens.push({produto_id:(prodId&&!stale)?parseInt(prodId):null,nome_produto:nomeProduto,quantidade:qtd,preco_unitario:preco});});return itens;}
 function verificarEstoque(itens,ignorarId=null){const prob=[];itens.forEach(it=>{if(!it.produto_id)return;const p=produtos.find(x=>x.id===it.produto_id);if(!p)return;let est=p.qtd;if(ignorarId){const ia=(pedidoItens[ignorarId]||[]).find(x=>x.produto_id===it.produto_id);if(ia)est+=ia.quantidade;}if(est<it.quantidade)prob.push(`${p.nome}: precisa de ${it.quantidade}, tem ${est}`);});return prob;}
 function checkStatusChange(){const s=document.getElementById('ped-status').value;const al=document.getElementById('alerta-estoque');if(s==='confirmado'){const editId=parseInt(document.getElementById('ped-edit-id').value)||0;const sAnt=document.getElementById('ped-status-anterior').value;if(sAnt==='confirmado')return;const prob=verificarEstoque(getItensForm(),editId&&sAnt==='confirmado'?editId:null);if(prob.length){al.classList.add('show');document.getElementById('alerta-estoque-msg').textContent='Estoque insuficiente: '+prob.join(' | ');}else al.classList.remove('show');}else al.classList.remove('show');}
