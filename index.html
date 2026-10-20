@@ -56,6 +56,8 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg);color:var(--text)
 .filters input,.filters select{padding:7px 11px;border:1px solid var(--border-med);border-radius:var(--radius);font-size:13px;background:var(--surface);color:var(--text);font-family:'Nunito Sans',sans-serif;transition:border 0.15s}
 .filters input:focus,.filters select:focus{outline:none;border-color:var(--amora)}
 .filters input{flex:1;min-width:180px}
+.filters .busca-obs{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;white-space:nowrap;user-select:none}
+.filters .busca-obs input{flex:none;min-width:0;width:15px;height:15px;padding:0;margin:0;accent-color:var(--amora);cursor:pointer}
 .cat-tabs{display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap}
 .cat-tab{padding:4px 13px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border-med);background:var(--surface);color:var(--text2);transition:all 0.12s;font-family:'Nunito Sans',sans-serif}
 .cat-tab:hover{background:var(--surface2)}
@@ -187,6 +189,8 @@ tr:hover td{background:var(--bg)}
 .prod-picker-item:last-child{border-bottom:none}
 .prod-picker-item:hover,.prod-picker-item.ativo{background:var(--amora-light)}
 .prod-picker-item small{color:var(--text3);white-space:nowrap}
+.prod-picker-meta{display:flex;flex-direction:column;align-items:flex-end;gap:1px;text-align:right}
+.prod-picker-meta b{color:var(--amora-dark);font-size:12px;font-weight:700}
 .prod-picker-vazio{padding:8px 10px;font-size:12px;color:var(--text3)}
 .estoque-ok{color:#3B6D11}.estoque-baixo{color:#BA7517}.estoque-zero{color:#A32D2D}
 .itens-resumo{background:var(--surface);border-radius:var(--radius);padding:8px 10px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:13px;border:1px solid var(--border)}
@@ -321,6 +325,7 @@ tr:hover td{background:var(--bg)}
   </div>
   <div class="filters">
     <input type="text" id="search-pedidos" placeholder="🔍 Buscar cliente ou produto..." oninput="renderPedidos()">
+    <label class="busca-obs" title="Também procura no texto das observações (endereço, telefone, itens avulsos...)"><input type="checkbox" id="search-pedidos-obs" onchange="renderPedidos()"> Incluir observações</label>
     <select id="filter-mes-pedidos" onchange="renderPedidos()"><option value="">Todos os meses</option></select>
     <select id="filter-canal" onchange="renderPedidos()">
       <option value="">Todos os canais</option>
@@ -1435,7 +1440,7 @@ function buscarProdItem(id){
   if(!normBusca(q)){lista.innerHTML='<div class="prod-picker-vazio">Digite partes do nome, em qualquer ordem — ex: <b>aluguel 13</b></div>';lista.classList.add('open');return;}
   const achados=filtrarProdutosBusca(q),mostrar=achados.slice(0,60);
   prodPickerAtivo[id]=mostrar.length?0:-1;
-  lista.innerHTML=mostrar.length?mostrar.map((p,i)=>`<div class="prod-picker-item${i===0?' ativo':''}" data-id="${p.id}" onmousedown="event.preventDefault();escolherProdItem(${id},${p.id})"><span>${escHtmlCat(p.nome)}</span><small>${p.qtd} em estoque</small></div>`).join('')+(achados.length>60?`<div class="prod-picker-vazio">+${achados.length-60} resultados — digite mais para refinar</div>`:''):'<div class="prod-picker-vazio">Nenhum produto encontrado</div>';
+  lista.innerHTML=mostrar.length?mostrar.map((p,i)=>`<div class="prod-picker-item${i===0?' ativo':''}" data-id="${p.id}" onmousedown="event.preventDefault();escolherProdItem(${id},${p.id})"><span>${escHtmlCat(p.nome)}</span><small class="prod-picker-meta"><b>${fmtMoney(p.preco)}</b>${p.qtd} em estoque</small></div>`).join('')+(achados.length>60?`<div class="prod-picker-vazio">+${achados.length-60} resultados — digite mais para refinar</div>`:''):'<div class="prod-picker-vazio">Nenhum produto encontrado</div>';
   lista.classList.add('open');
 }
 function teclaProdItem(e,id){
@@ -1535,7 +1540,14 @@ function clearProdutoForm(){document.getElementById('prod-edit-id').value='';doc
 
 // ============ PEDIDOS ============
 async function loadPedidos(){setSyncing(true);try{pedidos=await dbGet('pedidos');const itens=await dbGet('pedido_itens');pedidoItens={};itens.forEach(it=>{if(!pedidoItens[it.pedido_id])pedidoItens[it.pedido_id]=[];pedidoItens[it.pedido_id].push(it);});}catch(e){setSyncError();}finally{setSyncing(false);}buildMesOptions('filter-mes-pedidos','data_pedido',pedidos);renderPedidos();updateBadges();}
-function renderPedidos(){const search=(document.getElementById('search-pedidos')?.value||'').toLowerCase();const fCanal=document.getElementById('filter-canal')?.value||'';const fStatus=document.getElementById('filter-status-pedido')?.value||'';const fMes=document.getElementById('filter-mes-pedidos')?.value||'';let peds=[...pedidos];if(search)peds=peds.filter(p=>(p.cliente||'').toLowerCase().includes(search)||(p.produto||'').toLowerCase().includes(search)||(pedidoItens[p.id]||[]).some(it=>(it.nome_produto||'').toLowerCase().includes(search)));if(fCanal)peds=peds.filter(p=>p.canal===fCanal);if(fStatus)peds=peds.filter(p=>p.status===fStatus);if(fMes)peds=peds.filter(p=>p.data_pedido?.startsWith(fMes));peds=sortRows(peds,pedidosSort.field,pedidosSort.dir);updateSortIndicators('pedidos',pedidosSort,['id','cliente','canal','valor','status','data_pedido']);const total=pedidos.length,pend=pedidos.filter(p=>p.status==='pendente').length;const fat=pedidos.filter(p=>p.status!=='cancelado').reduce((a,p)=>a+(parseFloat(p.valor)||0),0);const wpp=pedidos.filter(p=>p.canal==='whatsapp').length;
+// Texto usado na busca de pedidos: cliente + produtos (+ observações, se marcado), sem acentos/maiúsculas
+function textoBuscaPedido(p,incluirObs){
+  const itens=(pedidoItens[p.id]||[]).map(it=>it.nome_produto||'').join(' ');
+  let t=' '+normBusca([p.cliente,p.produto,itens].join(' '))+' ';
+  if(incluirObs&&p.obs){t+=normBusca(p.obs)+' '+String(p.obs).replace(/\D+/g,'')+' ';} // só dígitos: acha telefone digitado junto (21999998888)
+  return t;
+}
+function renderPedidos(){const search=document.getElementById('search-pedidos')?.value||'';const buscaObs=!!document.getElementById('search-pedidos-obs')?.checked;const fCanal=document.getElementById('filter-canal')?.value||'';const fStatus=document.getElementById('filter-status-pedido')?.value||'';const fMes=document.getElementById('filter-mes-pedidos')?.value||'';let peds=[...pedidos];const tokensBusca=normBusca(search).split(' ').filter(Boolean);if(tokensBusca.length)peds=peds.filter(p=>{const txt=textoBuscaPedido(p,buscaObs);return tokensBusca.every(t=>txt.includes(t));});if(fCanal)peds=peds.filter(p=>p.canal===fCanal);if(fStatus)peds=peds.filter(p=>p.status===fStatus);if(fMes)peds=peds.filter(p=>p.data_pedido?.startsWith(fMes));peds=sortRows(peds,pedidosSort.field,pedidosSort.dir);updateSortIndicators('pedidos',pedidosSort,['id','cliente','canal','valor','status','data_pedido']);const total=pedidos.length,pend=pedidos.filter(p=>p.status==='pendente').length;const fat=pedidos.filter(p=>p.status!=='cancelado').reduce((a,p)=>a+(parseFloat(p.valor)||0),0);const wpp=pedidos.filter(p=>p.canal==='whatsapp').length;
 
   const isDona=perfilAtual==='dona';
   document.getElementById('stats-pedidos').innerHTML=`<div class="stat-card"><div class="slabel">Total de pedidos</div><div class="svalue">${total}</div></div><div class="stat-card"><div class="slabel">Pendentes</div><div class="svalue" style="color:#BA7517">${pend}</div><div class="ssub">aguardando ação</div></div>${isDona?`<div class="stat-card"><div class="slabel">Faturamento</div><div class="svalue" style="font-size:18px">${fmtMoney(fat)}</div></div>`:''}<div class="stat-card"><div class="slabel">Via WhatsApp</div><div class="svalue">${wpp}</div></div>`;
