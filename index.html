@@ -1586,8 +1586,13 @@ document.getElementById('prod-data').value=todayStr();
 document.getElementById('ped-data').value=todayStr();
 document.getElementById('con-data').value=todayStr();
 
+// Usuário cujos dados já estão carregados. O Supabase dispara SIGNED_IN de novo quando a aba
+// volta a ficar visível (revalidação da sessão) — nesse caso não recarrega nem mostra a tela de carregamento.
+let sessaoCarregada=null;
 SB.auth.onAuthStateChange(async(event,session)=>{
   if(event==='SIGNED_IN'&&session){
+    if(sessaoCarregada===session.user.id)return;
+    sessaoCarregada=session.user.id;
     document.getElementById('login-screen').classList.add('hidden');
     await mostrarUsuario(session.user);
     document.getElementById('loading-text').textContent='Carregando dados...';
@@ -1596,12 +1601,14 @@ SB.auth.onAuthStateChange(async(event,session)=>{
     catch(e){console.error(e);}
     finally{o.classList.add('hidden');setTimeout(()=>o.style.display='none',400);}
   }
-  if(event==='SIGNED_OUT'){document.getElementById('login-screen').classList.remove('hidden');}
+  if(event==='SIGNED_OUT'){sessaoCarregada=null;document.getElementById('login-screen').classList.remove('hidden');}
 });
 
 async function init(){
   const{data:{session}}=await SB.auth.getSession();
   if(!session){const o=document.getElementById('loading-overlay');o.classList.add('hidden');setTimeout(()=>o.style.display='none',400);return;}
+  if(sessaoCarregada===session.user.id)return; // já carregado pelo evento de login
+  sessaoCarregada=session.user.id;
   document.getElementById('login-screen').classList.add('hidden');
   await mostrarUsuario(session.user);
   document.getElementById('loading-text').textContent='Carregando dados...';
